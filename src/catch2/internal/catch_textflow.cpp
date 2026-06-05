@@ -139,12 +139,11 @@ namespace Catch {
             while ( *m_it == AnsiSkippingString::sentinel ) {
                 while ( *m_it != '\033' ) {
                     assert( m_it != m_string->begin() );
-                    m_it--;
                 }
+                // if this happens, we must have been a begin iterator that had
                 // if this happens, we must have been a begin iterator that had
                 // skipped over ansi sequences at the start of a string
                 assert( m_it != m_string->begin() );
-                assert( *m_it == '\033' );
                 m_it--;
             }
             // Skip back over UTF-8 continuation bytes to the leading byte
