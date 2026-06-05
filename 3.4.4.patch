@@ -1,0 +1,161 @@
+diff --git a/src/catch2/catch_assertion_result.cpp b/src/catch2/catch_assertion_result.cpp
+index dba86229..92f8cf29 100644
+--- a/src/catch2/catch_assertion_result.cpp
++++ b/src/catch2/catch_assertion_result.cpp
+@@ -102,4 +102,13 @@ namespace Catch {
+         return m_info.macroName;
+     }
+ 
+-} // end namespace Catch
++    void AssertionResult::setCustomMessage( std::string&& msg ) {
++        m_resultData.customMessage = CATCH_MOVE(msg);
++    }
++    bool AssertionResult::hasCustomMessage() const {
++        return !m_resultData.customMessage.empty();
++    }
++    StringRef AssertionResult::getCustomMessage() const {
++        return m_resultData.customMessage;
++    }
++
+diff --git a/src/catch2/catch_assertion_result.hpp b/src/catch2/catch_assertion_result.hpp
+index 48882876..a73fa265 100644
+--- a/src/catch2/catch_assertion_result.hpp
++++ b/src/catch2/catch_assertion_result.hpp
+@@ -28,6 +28,7 @@ namespace Catch {
+         mutable std::string reconstructedExpression;
+         LazyExpression lazyExpression;
+         ResultWas::OfType resultType;
++        std::string customMessage;
+ 
+         std::string reconstructExpression() const;
+     };
+@@ -50,11 +51,13 @@ namespace Catch {
+         SourceLineInfo getSourceInfo() const;
+         StringRef getTestMacroName() const;
+ 
+-    //protected:
++        void setCustomMessage( std::string&& msg );
++        bool hasCustomMessage() const;
++        StringRef getCustomMessage() const;
++
+         AssertionInfo m_info;
+         AssertionResultData m_resultData;
+     };
+ 
+ } // end namespace Catch
+ 
+-#endif // CATCH_ASSERTION_RESULT_HPP_INCLUDED
+diff --git a/src/catch2/internal/catch_assertion_handler.cpp b/src/catch2/internal/catch_assertion_handler.cpp
+index 79d5dcd8..c0f02341 100644
+--- a/src/catch2/internal/catch_assertion_handler.cpp
++++ b/src/catch2/internal/catch_assertion_handler.cpp
+@@ -14,8 +14,14 @@
+ #include <catch2/internal/catch_run_context.hpp>
+ #include <catch2/internal/catch_test_failure_exception.hpp>
+ #include <catch2/matchers/catch_matchers_string.hpp>
++#include <catch2/internal/catch_reusable_string_stream.hpp>
+ 
+ namespace Catch {
++    namespace Detail {
++        void setCustomAssertionMessage( std::string&& msg );
++        std::string takeCustomAssertionMessage();
++        bool hasCustomAssertionMessage();
++    }
+ 
+     void AssertionHandler::finishIncomplete() {
+         m_resultCapture.handleIncomplete( m_assertionInfo );
+@@ -33,9 +39,19 @@ namespace Catch {
+     }
+ 
+     void AssertionHandler::handleExpr( ITransientExpression const& expr ) {
++        ReusableStringStream rss;
++        rss << "[CUSTOM] " << m_assertionInfo.macroName
++            << "( " << m_assertionInfo.capturedExpression << " )"
++            << " at " << m_assertionInfo.lineInfo;
++        Detail::setCustomAssertionMessage( rss.str() );
+         m_resultCapture.handleExpr( m_assertionInfo, expr, m_reaction );
+     }
+     void AssertionHandler::handleMessage(ResultWas::OfType resultType, std::string&& message) {
++        ReusableStringStream rss;
++        rss << "[CUSTOM] " << m_assertionInfo.macroName
++            << " at " << m_assertionInfo.lineInfo
++            << " : " << message;
++        Detail::setCustomAssertionMessage( rss.str() );
+         m_resultCapture.handleMessage( m_assertionInfo, resultType, CATCH_MOVE(message), m_reaction );
+     }
+ 
+diff --git a/src/catch2/internal/catch_run_context.cpp b/src/catch2/internal/catch_run_context.cpp
+index a435170f..3eef08f9 100644
+--- a/src/catch2/internal/catch_run_context.cpp
++++ b/src/catch2/internal/catch_run_context.cpp
+@@ -233,6 +233,22 @@ namespace Catch {
+         // clear there for performance reasons.
+         static CATCH_INTERNAL_THREAD_LOCAL bool g_clearMessageScopes = false;
+ 
++        static CATCH_INTERNAL_THREAD_LOCAL std::string g_customAssertionMessage;
++
++        void setCustomAssertionMessage( std::string&& msg ) {
++            g_customAssertionMessage = CATCH_MOVE( msg );
++        }
++
++        std::string takeCustomAssertionMessage() {
++            std::string result;
++            result.swap( g_customAssertionMessage );
++            return result;
++        }
++
++        bool hasCustomAssertionMessage() {
++            return !g_customAssertionMessage.empty();
++        }
++
+ 
+         // Holds the data for both scoped and unscoped messages together,
+         // to avoid issues where their lifetimes start in wrong order,
+@@ -474,6 +490,10 @@ namespace Catch {
+         auto& msgHolder = Detail::g_messageHolder();
+         msgHolder.repairUnscopedMessageInvariant();
+ 
++        if ( Detail::hasCustomAssertionMessage() ) {
++            result.setCustomMessage( Detail::takeCustomAssertionMessage() );
++        }
++
+         // From here, we are touching shared state and need mutex.
+         Detail::LockGuard lock( m_assertionMutex );
+         {
+@@ -850,10 +870,6 @@ namespace Catch {
+         AssertionResult assertionResult{ info, CATCH_MOVE( data ) };
+         assertionResult.m_resultData.lazyExpression.m_transientExpression = expr;
+ 
+-        assertionEnded( CATCH_MOVE(assertionResult) );
+-    }
+-
+-    void RunContext::handleMessage(
+             AssertionInfo const& info,
+             ResultWas::OfType resultType,
+             std::string&& message,
+diff --git a/src/catch2/reporters/catch_reporter_console.cpp b/src/catch2/reporters/catch_reporter_console.cpp
+index acb4ae8e..e982939a 100644
+--- a/src/catch2/reporters/catch_reporter_console.cpp
++++ b/src/catch2/reporters/catch_reporter_console.cpp
+@@ -136,10 +136,6 @@ public:
+ 
+     void print() const {
+         printSourceInfo();
+-        if (stats.totals.assertions.total() > 0) {
+-            printResultType();
+-            printOriginalExpression();
+-            printReconstructedExpression();
+         } else {
+             stream << '\n';
+         }
+@@ -168,6 +164,10 @@ private:
+         }
+     }
+     void printMessage() const {
++        if ( result.hasCustomMessage() ) {
++            stream << colourImpl->guardColour( Colour::Error )
++                   << "  [CUSTOM] " << result.getCustomMessage() << '\n';
++        }
+         if (!messageLabel.empty())
+             stream << messageLabel << ':' << '\n';
+         for (auto const& msg : messages) {

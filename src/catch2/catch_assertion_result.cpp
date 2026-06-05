@@ -102,4 +102,13 @@ namespace Catch {
         return m_info.macroName;
     }
 
-} // end namespace Catch
+    void AssertionResult::setCustomMessage( std::string&& msg ) {
+        m_resultData.customMessage = CATCH_MOVE(msg);
+    }
+    bool AssertionResult::hasCustomMessage() const {
+        return !m_resultData.customMessage.empty();
+    }
+    StringRef AssertionResult::getCustomMessage() const {
+        return m_resultData.customMessage;
+    }
+

@@ -14,8 +14,14 @@
 #include <catch2/internal/catch_run_context.hpp>
 #include <catch2/internal/catch_test_failure_exception.hpp>
 #include <catch2/matchers/catch_matchers_string.hpp>
+#include <catch2/internal/catch_reusable_string_stream.hpp>
 
 namespace Catch {
+    namespace Detail {
+        void setCustomAssertionMessage( std::string&& msg );
+        std::string takeCustomAssertionMessage();
+        bool hasCustomAssertionMessage();
+    }
 
     void AssertionHandler::finishIncomplete() {
         m_resultCapture.handleIncomplete( m_assertionInfo );
@@ -33,9 +39,19 @@ namespace Catch {
     }
 
     void AssertionHandler::handleExpr( ITransientExpression const& expr ) {
+        ReusableStringStream rss;
+        rss << "[CUSTOM] " << m_assertionInfo.macroName
+            << "( " << m_assertionInfo.capturedExpression << " )"
+            << " at " << m_assertionInfo.lineInfo;
+        Detail::setCustomAssertionMessage( rss.str() );
         m_resultCapture.handleExpr( m_assertionInfo, expr, m_reaction );
     }
     void AssertionHandler::handleMessage(ResultWas::OfType resultType, std::string&& message) {
+        ReusableStringStream rss;
+        rss << "[CUSTOM] " << m_assertionInfo.macroName
+            << " at " << m_assertionInfo.lineInfo
+            << " : " << message;
+        Detail::setCustomAssertionMessage( rss.str() );
         m_resultCapture.handleMessage( m_assertionInfo, resultType, CATCH_MOVE(message), m_reaction );
     }
 

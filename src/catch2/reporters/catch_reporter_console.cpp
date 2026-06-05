@@ -136,10 +136,6 @@ public:
 
     void print() const {
         printSourceInfo();
-        if (stats.totals.assertions.total() > 0) {
-            printResultType();
-            printOriginalExpression();
-            printReconstructedExpression();
         } else {
             stream << '\n';
         }
@@ -168,6 +164,10 @@ private:
         }
     }
     void printMessage() const {
+        if ( result.hasCustomMessage() ) {
+            stream << colourImpl->guardColour( Colour::Error )
+                   << "  [CUSTOM] " << result.getCustomMessage() << '\n';
+        }
         if (!messageLabel.empty())
             stream << messageLabel << ':' << '\n';
         for (auto const& msg : messages) {

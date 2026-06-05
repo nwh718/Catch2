@@ -233,6 +233,22 @@ namespace Catch {
         // clear there for performance reasons.
         static CATCH_INTERNAL_THREAD_LOCAL bool g_clearMessageScopes = false;
 
+        static CATCH_INTERNAL_THREAD_LOCAL std::string g_customAssertionMessage;
+
+        void setCustomAssertionMessage( std::string&& msg ) {
+            g_customAssertionMessage = CATCH_MOVE( msg );
+        }
+
+        std::string takeCustomAssertionMessage() {
+            std::string result;
+            result.swap( g_customAssertionMessage );
+            return result;
+        }
+
+        bool hasCustomAssertionMessage() {
+            return !g_customAssertionMessage.empty();
+        }
+
 
         // Holds the data for both scoped and unscoped messages together,
         // to avoid issues where their lifetimes start in wrong order,
@@ -473,6 +489,10 @@ namespace Catch {
 
         auto& msgHolder = Detail::g_messageHolder();
         msgHolder.repairUnscopedMessageInvariant();
+
+        if ( Detail::hasCustomAssertionMessage() ) {
+            result.setCustomMessage( Detail::takeCustomAssertionMessage() );
+        }
 
         // From here, we are touching shared state and need mutex.
         Detail::LockGuard lock( m_assertionMutex );
@@ -850,10 +870,6 @@ namespace Catch {
         AssertionResult assertionResult{ info, CATCH_MOVE( data ) };
         assertionResult.m_resultData.lazyExpression.m_transientExpression = expr;
 
-        assertionEnded( CATCH_MOVE(assertionResult) );
-    }
-
-    void RunContext::handleMessage(
             AssertionInfo const& info,
             ResultWas::OfType resultType,
             std::string&& message,
