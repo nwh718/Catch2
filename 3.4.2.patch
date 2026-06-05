@@ -1,15 +1,4 @@
-diff --git a/3.4.1.patch b/3.4.1.patch
-index 3966fb6f..8e43c7cd 100644
---- a/3.4.1.patch
-+++ b/3.4.1.patch
-@@ -1,9 +1,89 @@
--diff --git a/3.4.1.patch b/3.4.1.patch
--new file mode 100644
--index 00000000..0beb5851
----- /dev/null
--+++ b/3.4.1.patch
--@@ -0,0 +1,85 @@
-+
+
 +++diff --git a/src/catch2/catch_assertion_result.cpp b/src/catch2/catch_assertion_result.cpp
 +++index dba86229..7bcaa2b8 100644
 +++--- a/src/catch2/catch_assertion_result.cpp

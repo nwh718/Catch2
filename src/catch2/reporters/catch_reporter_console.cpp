@@ -58,11 +58,10 @@ public:
         case ResultWas::Ok:
             colour = Colour::Success;
             passOrFail = "PASSED"_sr;
-            if ( result.hasCustomMessage() )
-                messageLabel = "with custom message"_sr;
-            else if (messages.size() == 1)
+            //if( result.hasMessage() )
+            if (messages.size() == 1)
                 messageLabel = "with message"_sr;
-            else if (messages.size() > 1)
+            if (messages.size() > 1)
                 messageLabel = "with messages"_sr;
             break;
         case ResultWas::ExpressionFailed:
@@ -73,11 +72,9 @@ public:
                 colour = Colour::Error;
                 passOrFail = "FAILED"_sr;
             }
-            if ( result.hasCustomMessage() )
-                messageLabel = "with custom message"_sr;
-            else if (messages.size() == 1)
+            if (messages.size() == 1)
                 messageLabel = "with message"_sr;
-            else if (messages.size() > 1)
+            if (messages.size() > 1)
                 messageLabel = "with messages"_sr;
             break;
         case ResultWas::ThrewException:
@@ -139,6 +136,10 @@ public:
 
     void print() const {
         printSourceInfo();
+        if (result.hasCustomMessage()) {
+            stream << colourImpl->guardColour(Colour::Warning)
+                   << "  Custom Message: " << result.getCustomMessage() << '\n';
+        }
         if (stats.totals.assertions.total() > 0) {
             printResultType();
             printOriginalExpression();
@@ -156,18 +157,12 @@ private:
         }
     }
     void printOriginalExpression() const {
-        if ( result.hasCustomMessage() ) {
-            return;
-        }
         if (result.hasExpression()) {
             stream << colourImpl->guardColour( Colour::OriginalExpression )
                    << "  " << result.getExpressionInMacro() << '\n';
         }
     }
     void printReconstructedExpression() const {
-        if ( result.hasCustomMessage() ) {
-            return;
-        }
         if (result.hasExpandedExpression()) {
             stream << "with expansion:\n";
             stream << colourImpl->guardColour( Colour::ReconstructedExpression )
@@ -179,10 +174,8 @@ private:
     void printMessage() const {
         if (!messageLabel.empty())
             stream << messageLabel << ':' << '\n';
-        if ( result.hasCustomMessage() ) {
-            stream << TextFlow::Column( result.getCustomMessage() ).indent( 2 ) << '\n';
-        }
         for (auto const& msg : messages) {
+            // If this assertion is a warning ignore any INFO messages
             if (printInfoMessages || msg.type != ResultWas::Info)
                 stream << TextFlow::Column(msg.message).indent(2) << '\n';
         }

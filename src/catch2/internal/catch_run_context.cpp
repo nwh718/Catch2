@@ -849,8 +849,9 @@ namespace Catch {
 
         AssertionResult assertionResult{ info, CATCH_MOVE( data ) };
         assertionResult.m_resultData.lazyExpression.m_transientExpression = expr;
-        if ( resultType == ResultWas::ExpressionFailed ) {
-            assertionResult.setCustomMessage();
+
+        if (!assertionResult.isOk()) {
+            assertionResult.setCustomMessage("Custom thread-safe assertion failed info");
         }
 
         assertionEnded( CATCH_MOVE(assertionResult) );
