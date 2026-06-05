@@ -1,0 +1,107 @@
+diff --git a/src/catch2/catch_approx.cpp b/src/catch2/catch_approx.cpp
+index 08c6799b..e4549510 100644
+--- a/src/catch2/catch_approx.cpp
++++ b/src/catch2/catch_approx.cpp
+@@ -1,4 +1,5 @@
+ 
++
+ //              Copyright Catch2 Authors
+ // Distributed under the Boost Software License, Version 1.0.
+ //   (See accompanying file LICENSE.txt or copy at
+@@ -14,12 +15,14 @@
+ 
+ namespace {
+ 
+-// Performs equivalent check of std::fabs(lhs - rhs) <= margin
+-// But without the subtraction to allow for INFINITY in comparison
+ bool marginComparison(double lhs, double rhs, double margin) {
+     return (lhs + margin >= rhs) && (rhs + margin >= lhs);
+ }
+ 
++double computeEpsilonMargin(double epsilon, double scale, double value) {
++    return epsilon * (scale + std::fabs(std::isinf(value) ? 0 : value));
++}
++
+ }
+ 
+ namespace Catch {
+@@ -41,7 +44,6 @@ namespace Catch {
+         return temp;
+     }
+ 
+-
+     std::string Approx::toString() const {
+         ReusableStringStream rss;
+         rss << "Approx( " << ::Catch::Detail::stringify( m_value ) << " )";
+@@ -49,10 +51,8 @@ namespace Catch {
+     }
+ 
+     bool Approx::equalityComparisonImpl(const double other) const {
+-        // First try with fixed margin, then compute margin based on epsilon, scale and Approx's value
+-        // Thanks to Richard Harris for his help refining the scaled margin value
+         return marginComparison(m_value, other, m_margin)
+-            || marginComparison(m_value, other, m_epsilon * (m_scale + std::fabs(std::isinf(m_value)? 0 : m_value)));
++            || marginComparison(m_value, other, computeEpsilonMargin(m_epsilon, m_scale, m_value));
+     }
+ 
+     void Approx::setMargin(double newMargin) {
+@@ -73,6 +73,7 @@ namespace literals {
+     Approx operator ""_a(long double val) {
+         return Approx(val);
+     }
++
+     Approx operator ""_a(unsigned long long val) {
+         return Approx(val);
+     }
+diff --git a/src/catch2/internal/catch_floating_point_helpers.hpp b/src/catch2/internal/catch_floating_point_helpers.hpp
+index b2143726..1ee6d0b9 100644
+--- a/src/catch2/internal/catch_floating_point_helpers.hpp
++++ b/src/catch2/internal/catch_floating_point_helpers.hpp
+@@ -27,12 +27,6 @@ namespace Catch {
+         bool directCompare( float lhs, float rhs );
+         bool directCompare( double lhs, double rhs );
+ 
+-    } // end namespace Detail
+-
+-
+-
+-#if defined( __GNUC__ ) || defined( __clang__ )
+-#    pragma GCC diagnostic push
+     // We do a bunch of direct compensations of floating point numbers,
+     // because we know what we are doing and actually do want the direct
+     // comparison behaviour.
+diff --git a/src/catch2/matchers/catch_matchers_floating_point.cpp b/src/catch2/matchers/catch_matchers_floating_point.cpp
+index fc7b444e..d9682994 100644
+--- a/src/catch2/matchers/catch_matchers_floating_point.cpp
++++ b/src/catch2/matchers/catch_matchers_floating_point.cpp
+@@ -53,6 +53,12 @@ bool marginComparison(double lhs, double rhs, double margin) {
+     return (lhs + margin >= rhs) && (rhs + margin >= lhs);
+ }
+ 
++// Performs equivalent check of std::fabs(lhs - rhs) <= margin
++// But without the subtraction to allow for INFINITY in comparison
++bool marginComparison(double lhs, double rhs, double margin) {
++    return (lhs + margin >= rhs) && (rhs + margin >= lhs);
++}
++
+ template <typename FloatingPoint>
+ void write(std::ostream& out, FloatingPoint num) {
+     out << std::scientific
+@@ -76,7 +82,7 @@ namespace Detail {
+     WithinAbsMatcher::WithinAbsMatcher(double target, double margin)
+         :m_target{ target }, m_margin{ margin } {
+         CATCH_ENFORCE(margin >= 0, "Invalid margin: " << margin << '.'
+-            << " Margin has to be non-negative.");
++        return (matchee + m_margin >= m_target) && (m_target + m_margin >= matchee);
+     }
+ 
+     // Performs equivalent check of std::fabs(lhs - rhs) <= margin
+@@ -164,7 +170,7 @@ namespace Detail {
+     WithinRelMatcher::WithinRelMatcher(double target, double epsilon):
+         m_target(target),
+         m_epsilon(epsilon){
+-        CATCH_ENFORCE(m_epsilon >= 0., "Relative comparison with epsilon <  0 does not make sense.");
++        return marginComparison(matchee, m_target,
+         CATCH_ENFORCE(m_epsilon  < 1., "Relative comparison with epsilon >= 1 does not make sense.");
+     }
+ 

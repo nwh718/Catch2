@@ -1,4 +1,5 @@
 
+
 //              Copyright Catch2 Authors
 // Distributed under the Boost Software License, Version 1.0.
 //   (See accompanying file LICENSE.txt or copy at
@@ -14,10 +15,12 @@
 
 namespace {
 
-// Performs equivalent check of std::fabs(lhs - rhs) <= margin
-// But without the subtraction to allow for INFINITY in comparison
 bool marginComparison(double lhs, double rhs, double margin) {
     return (lhs + margin >= rhs) && (rhs + margin >= lhs);
+}
+
+double computeEpsilonMargin(double epsilon, double scale, double value) {
+    return epsilon * (scale + std::fabs(std::isinf(value) ? 0 : value));
 }
 
 }
@@ -41,7 +44,6 @@ namespace Catch {
         return temp;
     }
 
-
     std::string Approx::toString() const {
         ReusableStringStream rss;
         rss << "Approx( " << ::Catch::Detail::stringify( m_value ) << " )";
@@ -49,10 +51,8 @@ namespace Catch {
     }
 
     bool Approx::equalityComparisonImpl(const double other) const {
-        // First try with fixed margin, then compute margin based on epsilon, scale and Approx's value
-        // Thanks to Richard Harris for his help refining the scaled margin value
         return marginComparison(m_value, other, m_margin)
-            || marginComparison(m_value, other, m_epsilon * (m_scale + std::fabs(std::isinf(m_value)? 0 : m_value)));
+            || marginComparison(m_value, other, computeEpsilonMargin(m_epsilon, m_scale, m_value));
     }
 
     void Approx::setMargin(double newMargin) {
@@ -73,6 +73,7 @@ namespace literals {
     Approx operator ""_a(long double val) {
         return Approx(val);
     }
+
     Approx operator ""_a(unsigned long long val) {
         return Approx(val);
     }

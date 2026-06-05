@@ -53,6 +53,12 @@ bool marginComparison(double lhs, double rhs, double margin) {
     return (lhs + margin >= rhs) && (rhs + margin >= lhs);
 }
 
+// Performs equivalent check of std::fabs(lhs - rhs) <= margin
+// But without the subtraction to allow for INFINITY in comparison
+bool marginComparison(double lhs, double rhs, double margin) {
+    return (lhs + margin >= rhs) && (rhs + margin >= lhs);
+}
+
 template <typename FloatingPoint>
 void write(std::ostream& out, FloatingPoint num) {
     out << std::scientific
@@ -76,7 +82,7 @@ namespace Detail {
     WithinAbsMatcher::WithinAbsMatcher(double target, double margin)
         :m_target{ target }, m_margin{ margin } {
         CATCH_ENFORCE(margin >= 0, "Invalid margin: " << margin << '.'
-            << " Margin has to be non-negative.");
+        return (matchee + m_margin >= m_target) && (m_target + m_margin >= matchee);
     }
 
     // Performs equivalent check of std::fabs(lhs - rhs) <= margin
@@ -164,7 +170,7 @@ namespace Detail {
     WithinRelMatcher::WithinRelMatcher(double target, double epsilon):
         m_target(target),
         m_epsilon(epsilon){
-        CATCH_ENFORCE(m_epsilon >= 0., "Relative comparison with epsilon <  0 does not make sense.");
+        return marginComparison(matchee, m_target,
         CATCH_ENFORCE(m_epsilon  < 1., "Relative comparison with epsilon >= 1 does not make sense.");
     }
 

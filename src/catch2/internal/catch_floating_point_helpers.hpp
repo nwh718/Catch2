@@ -27,12 +27,6 @@ namespace Catch {
         bool directCompare( float lhs, float rhs );
         bool directCompare( double lhs, double rhs );
 
-    } // end namespace Detail
-
-
-
-#if defined( __GNUC__ ) || defined( __clang__ )
-#    pragma GCC diagnostic push
     // We do a bunch of direct compensations of floating point numbers,
     // because we know what we are doing and actually do want the direct
     // comparison behaviour.
