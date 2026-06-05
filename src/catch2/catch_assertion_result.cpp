@@ -1,4 +1,3 @@
-
 //              Copyright Catch2 Authors
 // Distributed under the Boost Software License, Version 1.0.
 //   (See accompanying file LICENSE.txt or copy at
@@ -32,12 +31,10 @@ namespace Catch {
         m_resultData( CATCH_MOVE(data) )
     {}
 
-    // Result was a success
     bool AssertionResult::succeeded() const {
         return Catch::isOk( m_resultData.resultType );
     }
 
-    // Result was a success, or failure is suppressed
     bool AssertionResult::isOk() const {
         return Catch::isOk( m_resultData.resultType ) || shouldSuppressFailure( m_info.resultDisposition );
     }
@@ -54,8 +51,34 @@ namespace Catch {
         return !m_resultData.message.empty();
     }
 
+    bool AssertionResult::hasCustomMessage() const {
+        return !m_resultData.customMessage.empty();
+    }
+
+    void AssertionResult::setCustomMessage() {
+        std::string customMessage;
+
+        if( hasExpression() ) {
+            customMessage += "assertion: ";
+            customMessage += getExpressionInMacro();
+        }
+
+        if( hasExpandedExpression() ) {
+            if( !customMessage.empty() ) {
+                customMessage += '\n';
+            }
+            customMessage += "expanded: ";
+            customMessage += getExpandedExpression();
+        }
+
+        if( customMessage.empty() && hasMessage() ) {
+            customMessage = static_cast<std::string>( getMessage() );
+        }
+
+        m_resultData.customMessage = CATCH_MOVE( customMessage );
+    }
+
     std::string AssertionResult::getExpression() const {
-        // Possibly overallocating by 3 characters should be basically free
         std::string expr; expr.reserve(m_info.capturedExpression.size() + 3);
         if (isFalseTest(m_info.resultDisposition)) {
             expr += "!(";
@@ -94,24 +117,17 @@ namespace Catch {
     StringRef AssertionResult::getMessage() const {
         return m_resultData.message;
     }
+
+    StringRef AssertionResult::getCustomMessage() const {
+        return m_resultData.customMessage;
+    }
+
     SourceLineInfo AssertionResult::getSourceInfo() const {
         return m_info.lineInfo;
     }
 
     StringRef AssertionResult::getTestMacroName() const {
-            return m_info.macroName;
-        }
-        
-        bool AssertionResult::hasCustomMessage() const {
-            return !m_resultData.customMessage.empty();
-        }
-        
-        StringRef AssertionResult::getCustomMessage() const {
-            return m_resultData.customMessage;
-        }
-        
-        void AssertionResult::setCustomMessage(std::string const& message) {
-            m_resultData.customMessage = message;
-        }
+        return m_info.macroName;
+    }
 
 } // end namespace Catch

@@ -1,0 +1,312 @@
+diff --git a/3.4.1.patch b/3.4.1.patch
+index 3966fb6f..8e43c7cd 100644
+--- a/3.4.1.patch
++++ b/3.4.1.patch
+@@ -1,9 +1,89 @@
+-diff --git a/3.4.1.patch b/3.4.1.patch
+-new file mode 100644
+-index 00000000..0beb5851
+---- /dev/null
+-+++ b/3.4.1.patch
+-@@ -0,0 +1,85 @@
++
++++diff --git a/src/catch2/catch_assertion_result.cpp b/src/catch2/catch_assertion_result.cpp
++++index dba86229..7bcaa2b8 100644
++++--- a/src/catch2/catch_assertion_result.cpp
+++++++ b/src/catch2/catch_assertion_result.cpp
++++@@ -99,7 +99,19 @@ namespace Catch {
++++     }
++++ 
++++     StringRef AssertionResult::getTestMacroName() const {
++++-        return m_info.macroName;
++++-    }
+++++            return m_info.macroName;
+++++        }
+++++        
+++++        bool AssertionResult::hasCustomMessage() const {
+++++            return !m_resultData.customMessage.empty();
+++++        }
+++++        
+++++        StringRef AssertionResult::getCustomMessage() const {
+++++            return m_resultData.customMessage;
+++++        }
+++++        
+++++        void AssertionResult::setCustomMessage(std::string const& message) {
+++++            m_resultData.customMessage = message;
+++++        }
++++ 
++++ } // end namespace Catch
++++diff --git a/src/catch2/catch_assertion_result.hpp b/src/catch2/catch_assertion_result.hpp
++++index 48882876..a254f3fa 100644
++++--- a/src/catch2/catch_assertion_result.hpp
+++++++ b/src/catch2/catch_assertion_result.hpp
++++@@ -25,6 +25,7 @@ namespace Catch {
++++         AssertionResultData( ResultWas::OfType _resultType, LazyExpression const& _lazyExpression );
++++ 
++++         std::string message;
+++++        std::string customMessage;
++++         mutable std::string reconstructedExpression;
++++         LazyExpression lazyExpression;
++++         ResultWas::OfType resultType;
++++@@ -49,8 +50,12 @@ namespace Catch {
++++         StringRef getMessage() const;
++++         SourceLineInfo getSourceInfo() const;
++++         StringRef getTestMacroName() const;
+++++        
+++++        bool hasCustomMessage() const;
+++++        StringRef getCustomMessage() const;
+++++        void setCustomMessage(std::string const& message);
++++ 
++++-    //protected:
+++++    // protected:
++++         AssertionInfo m_info;
++++         AssertionResultData m_resultData;
++++     };
++++diff --git a/src/catch2/internal/catch_run_context.cpp b/src/catch2/internal/catch_run_context.cpp
++++index a435170f..5e5c5b9e 100644
++++--- a/src/catch2/internal/catch_run_context.cpp
+++++++ b/src/catch2/internal/catch_run_context.cpp
++++@@ -850,6 +850,13 @@ namespace Catch {
++++         AssertionResult assertionResult{ info, CATCH_MOVE( data ) };
++++         assertionResult.m_resultData.lazyExpression.m_transientExpression = expr;
++++ 
+++++        // 如果断言失败，设置自定义消息
+++++        if (resultType == ResultWas::ExpressionFailed) {
+++++            ReusableStringStream rss;
+++++            rss << "Assertion failed: " << info.capturedExpression;
+++++            assertionResult.setCustomMessage(rss.str());
+++++        }
+++++
++++         assertionEnded( CATCH_MOVE(assertionResult) );
++++     }
++++ 
++++diff --git a/src/catch2/reporters/catch_reporter_console.cpp b/src/catch2/reporters/catch_reporter_console.cpp
++++index acb4ae8e..0b9b98c1 100644
++++--- a/src/catch2/reporters/catch_reporter_console.cpp
+++++++ b/src/catch2/reporters/catch_reporter_console.cpp
++++@@ -168,6 +168,10 @@ private:
++++         }
++++     }
++++     void printMessage() const {
+++++        if (result.hasCustomMessage()) {
+++++            stream << "Custom Message:" << '\n';
+++++            stream << TextFlow::Column(result.getCustomMessage()).indent(2) << '\n';
+++++        }
++++         if (!messageLabel.empty())
++++             stream << messageLabel << ':' << '\n';
++++         for (auto const& msg : messages) {
+ +diff --git a/src/catch2/catch_assertion_result.cpp b/src/catch2/catch_assertion_result.cpp
+ +index dba86229..7bcaa2b8 100644
+ +--- a/src/catch2/catch_assertion_result.cpp
+diff --git a/src/catch2/catch_assertion_result.cpp b/src/catch2/catch_assertion_result.cpp
+index 7bcaa2b8..986d1417 100644
+--- a/src/catch2/catch_assertion_result.cpp
++++ b/src/catch2/catch_assertion_result.cpp
+@@ -1,4 +1,3 @@
+-
+ //              Copyright Catch2 Authors
+ // Distributed under the Boost Software License, Version 1.0.
+ //   (See accompanying file LICENSE.txt or copy at
+@@ -32,12 +31,10 @@ namespace Catch {
+         m_resultData( CATCH_MOVE(data) )
+     {}
+ 
+-    // Result was a success
+     bool AssertionResult::succeeded() const {
+         return Catch::isOk( m_resultData.resultType );
+     }
+ 
+-    // Result was a success, or failure is suppressed
+     bool AssertionResult::isOk() const {
+         return Catch::isOk( m_resultData.resultType ) || shouldSuppressFailure( m_info.resultDisposition );
+     }
+@@ -54,8 +51,34 @@ namespace Catch {
+         return !m_resultData.message.empty();
+     }
+ 
++    bool AssertionResult::hasCustomMessage() const {
++        return !m_resultData.customMessage.empty();
++    }
++
++    void AssertionResult::setCustomMessage() {
++        std::string customMessage;
++
++        if( hasExpression() ) {
++            customMessage += "assertion: ";
++            customMessage += getExpressionInMacro();
++        }
++
++        if( hasExpandedExpression() ) {
++            if( !customMessage.empty() ) {
++                customMessage += '\n';
++            }
++            customMessage += "expanded: ";
++            customMessage += getExpandedExpression();
++        }
++
++        if( customMessage.empty() && hasMessage() ) {
++            customMessage = static_cast<std::string>( getMessage() );
++        }
++
++        m_resultData.customMessage = CATCH_MOVE( customMessage );
++    }
++
+     std::string AssertionResult::getExpression() const {
+-        // Possibly overallocating by 3 characters should be basically free
+         std::string expr; expr.reserve(m_info.capturedExpression.size() + 3);
+         if (isFalseTest(m_info.resultDisposition)) {
+             expr += "!(";
+@@ -94,24 +117,17 @@ namespace Catch {
+     StringRef AssertionResult::getMessage() const {
+         return m_resultData.message;
+     }
++
++    StringRef AssertionResult::getCustomMessage() const {
++        return m_resultData.customMessage;
++    }
++
+     SourceLineInfo AssertionResult::getSourceInfo() const {
+         return m_info.lineInfo;
+     }
+ 
+     StringRef AssertionResult::getTestMacroName() const {
+-            return m_info.macroName;
+-        }
+-        
+-        bool AssertionResult::hasCustomMessage() const {
+-            return !m_resultData.customMessage.empty();
+-        }
+-        
+-        StringRef AssertionResult::getCustomMessage() const {
+-            return m_resultData.customMessage;
+-        }
+-        
+-        void AssertionResult::setCustomMessage(std::string const& message) {
+-            m_resultData.customMessage = message;
+-        }
++        return m_info.macroName;
++    }
+ 
+ } // end namespace Catch
+diff --git a/src/catch2/catch_assertion_result.hpp b/src/catch2/catch_assertion_result.hpp
+index a254f3fa..47e01ded 100644
+--- a/src/catch2/catch_assertion_result.hpp
++++ b/src/catch2/catch_assertion_result.hpp
+@@ -1,4 +1,3 @@
+-
+ //              Copyright Catch2 Authors
+ // Distributed under the Boost Software License, Version 1.0.
+ //   (See accompanying file LICENSE.txt or copy at
+@@ -43,19 +42,18 @@ namespace Catch {
+         ResultWas::OfType getResultType() const;
+         bool hasExpression() const;
+         bool hasMessage() const;
++        bool hasCustomMessage() const;
++        void setCustomMessage();
+         std::string getExpression() const;
+         std::string getExpressionInMacro() const;
+         bool hasExpandedExpression() const;
+         std::string getExpandedExpression() const;
+         StringRef getMessage() const;
++        StringRef getCustomMessage() const;
+         SourceLineInfo getSourceInfo() const;
+         StringRef getTestMacroName() const;
+-        
+-        bool hasCustomMessage() const;
+-        StringRef getCustomMessage() const;
+-        void setCustomMessage(std::string const& message);
+ 
+-    // protected:
++    //protected:
+         AssertionInfo m_info;
+         AssertionResultData m_resultData;
+     };
+diff --git a/src/catch2/internal/catch_run_context.cpp b/src/catch2/internal/catch_run_context.cpp
+index 5e5c5b9e..e9a47e12 100644
+--- a/src/catch2/internal/catch_run_context.cpp
++++ b/src/catch2/internal/catch_run_context.cpp
+@@ -849,12 +849,8 @@ namespace Catch {
+ 
+         AssertionResult assertionResult{ info, CATCH_MOVE( data ) };
+         assertionResult.m_resultData.lazyExpression.m_transientExpression = expr;
+-
+-        // 如果断言失败，设置自定义消息
+-        if (resultType == ResultWas::ExpressionFailed) {
+-            ReusableStringStream rss;
+-            rss << "Assertion failed: " << info.capturedExpression;
+-            assertionResult.setCustomMessage(rss.str());
++        if ( resultType == ResultWas::ExpressionFailed ) {
++            assertionResult.setCustomMessage();
+         }
+ 
+         assertionEnded( CATCH_MOVE(assertionResult) );
+diff --git a/src/catch2/reporters/catch_reporter_console.cpp b/src/catch2/reporters/catch_reporter_console.cpp
+index 0b9b98c1..244fa86a 100644
+--- a/src/catch2/reporters/catch_reporter_console.cpp
++++ b/src/catch2/reporters/catch_reporter_console.cpp
+@@ -58,10 +58,11 @@ public:
+         case ResultWas::Ok:
+             colour = Colour::Success;
+             passOrFail = "PASSED"_sr;
+-            //if( result.hasMessage() )
+-            if (messages.size() == 1)
++            if ( result.hasCustomMessage() )
++                messageLabel = "with custom message"_sr;
++            else if (messages.size() == 1)
+                 messageLabel = "with message"_sr;
+-            if (messages.size() > 1)
++            else if (messages.size() > 1)
+                 messageLabel = "with messages"_sr;
+             break;
+         case ResultWas::ExpressionFailed:
+@@ -72,9 +73,11 @@ public:
+                 colour = Colour::Error;
+                 passOrFail = "FAILED"_sr;
+             }
+-            if (messages.size() == 1)
++            if ( result.hasCustomMessage() )
++                messageLabel = "with custom message"_sr;
++            else if (messages.size() == 1)
+                 messageLabel = "with message"_sr;
+-            if (messages.size() > 1)
++            else if (messages.size() > 1)
+                 messageLabel = "with messages"_sr;
+             break;
+         case ResultWas::ThrewException:
+@@ -153,12 +156,18 @@ private:
+         }
+     }
+     void printOriginalExpression() const {
++        if ( result.hasCustomMessage() ) {
++            return;
++        }
+         if (result.hasExpression()) {
+             stream << colourImpl->guardColour( Colour::OriginalExpression )
+                    << "  " << result.getExpressionInMacro() << '\n';
+         }
+     }
+     void printReconstructedExpression() const {
++        if ( result.hasCustomMessage() ) {
++            return;
++        }
+         if (result.hasExpandedExpression()) {
+             stream << "with expansion:\n";
+             stream << colourImpl->guardColour( Colour::ReconstructedExpression )
+@@ -168,14 +177,12 @@ private:
+         }
+     }
+     void printMessage() const {
+-        if (result.hasCustomMessage()) {
+-            stream << "Custom Message:" << '\n';
+-            stream << TextFlow::Column(result.getCustomMessage()).indent(2) << '\n';
+-        }
+         if (!messageLabel.empty())
+             stream << messageLabel << ':' << '\n';
++        if ( result.hasCustomMessage() ) {
++            stream << TextFlow::Column( result.getCustomMessage() ).indent( 2 ) << '\n';
++        }
+         for (auto const& msg : messages) {
+-            // If this assertion is a warning ignore any INFO messages
+             if (printInfoMessages || msg.type != ResultWas::Info)
+                 stream << TextFlow::Column(msg.message).indent(2) << '\n';
+         }

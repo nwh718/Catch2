@@ -1,9 +1,89 @@
-diff --git a/3.4.1.patch b/3.4.1.patch
-new file mode 100644
-index 00000000..0beb5851
---- /dev/null
-+++ b/3.4.1.patch
-@@ -0,0 +1,85 @@
+
+++diff --git a/src/catch2/catch_assertion_result.cpp b/src/catch2/catch_assertion_result.cpp
+++index dba86229..7bcaa2b8 100644
+++--- a/src/catch2/catch_assertion_result.cpp
++++++ b/src/catch2/catch_assertion_result.cpp
+++@@ -99,7 +99,19 @@ namespace Catch {
+++     }
+++ 
+++     StringRef AssertionResult::getTestMacroName() const {
+++-        return m_info.macroName;
+++-    }
++++            return m_info.macroName;
++++        }
++++        
++++        bool AssertionResult::hasCustomMessage() const {
++++            return !m_resultData.customMessage.empty();
++++        }
++++        
++++        StringRef AssertionResult::getCustomMessage() const {
++++            return m_resultData.customMessage;
++++        }
++++        
++++        void AssertionResult::setCustomMessage(std::string const& message) {
++++            m_resultData.customMessage = message;
++++        }
+++ 
+++ } // end namespace Catch
+++diff --git a/src/catch2/catch_assertion_result.hpp b/src/catch2/catch_assertion_result.hpp
+++index 48882876..a254f3fa 100644
+++--- a/src/catch2/catch_assertion_result.hpp
++++++ b/src/catch2/catch_assertion_result.hpp
+++@@ -25,6 +25,7 @@ namespace Catch {
+++         AssertionResultData( ResultWas::OfType _resultType, LazyExpression const& _lazyExpression );
+++ 
+++         std::string message;
++++        std::string customMessage;
+++         mutable std::string reconstructedExpression;
+++         LazyExpression lazyExpression;
+++         ResultWas::OfType resultType;
+++@@ -49,8 +50,12 @@ namespace Catch {
+++         StringRef getMessage() const;
+++         SourceLineInfo getSourceInfo() const;
+++         StringRef getTestMacroName() const;
++++        
++++        bool hasCustomMessage() const;
++++        StringRef getCustomMessage() const;
++++        void setCustomMessage(std::string const& message);
+++ 
+++-    //protected:
++++    // protected:
+++         AssertionInfo m_info;
+++         AssertionResultData m_resultData;
+++     };
+++diff --git a/src/catch2/internal/catch_run_context.cpp b/src/catch2/internal/catch_run_context.cpp
+++index a435170f..5e5c5b9e 100644
+++--- a/src/catch2/internal/catch_run_context.cpp
++++++ b/src/catch2/internal/catch_run_context.cpp
+++@@ -850,6 +850,13 @@ namespace Catch {
+++         AssertionResult assertionResult{ info, CATCH_MOVE( data ) };
+++         assertionResult.m_resultData.lazyExpression.m_transientExpression = expr;
+++ 
++++        // 如果断言失败，设置自定义消息
++++        if (resultType == ResultWas::ExpressionFailed) {
++++            ReusableStringStream rss;
++++            rss << "Assertion failed: " << info.capturedExpression;
++++            assertionResult.setCustomMessage(rss.str());
++++        }
++++
+++         assertionEnded( CATCH_MOVE(assertionResult) );
+++     }
+++ 
+++diff --git a/src/catch2/reporters/catch_reporter_console.cpp b/src/catch2/reporters/catch_reporter_console.cpp
+++index acb4ae8e..0b9b98c1 100644
+++--- a/src/catch2/reporters/catch_reporter_console.cpp
++++++ b/src/catch2/reporters/catch_reporter_console.cpp
+++@@ -168,6 +168,10 @@ private:
+++         }
+++     }
+++     void printMessage() const {
++++        if (result.hasCustomMessage()) {
++++            stream << "Custom Message:" << '\n';
++++            stream << TextFlow::Column(result.getCustomMessage()).indent(2) << '\n';
++++        }
+++         if (!messageLabel.empty())
+++             stream << messageLabel << ':' << '\n';
+++         for (auto const& msg : messages) {
 +diff --git a/src/catch2/catch_assertion_result.cpp b/src/catch2/catch_assertion_result.cpp
 +index dba86229..7bcaa2b8 100644
 +--- a/src/catch2/catch_assertion_result.cpp

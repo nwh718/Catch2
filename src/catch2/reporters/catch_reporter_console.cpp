@@ -58,10 +58,11 @@ public:
         case ResultWas::Ok:
             colour = Colour::Success;
             passOrFail = "PASSED"_sr;
-            //if( result.hasMessage() )
-            if (messages.size() == 1)
+            if ( result.hasCustomMessage() )
+                messageLabel = "with custom message"_sr;
+            else if (messages.size() == 1)
                 messageLabel = "with message"_sr;
-            if (messages.size() > 1)
+            else if (messages.size() > 1)
                 messageLabel = "with messages"_sr;
             break;
         case ResultWas::ExpressionFailed:
@@ -72,9 +73,11 @@ public:
                 colour = Colour::Error;
                 passOrFail = "FAILED"_sr;
             }
-            if (messages.size() == 1)
+            if ( result.hasCustomMessage() )
+                messageLabel = "with custom message"_sr;
+            else if (messages.size() == 1)
                 messageLabel = "with message"_sr;
-            if (messages.size() > 1)
+            else if (messages.size() > 1)
                 messageLabel = "with messages"_sr;
             break;
         case ResultWas::ThrewException:
@@ -153,12 +156,18 @@ private:
         }
     }
     void printOriginalExpression() const {
+        if ( result.hasCustomMessage() ) {
+            return;
+        }
         if (result.hasExpression()) {
             stream << colourImpl->guardColour( Colour::OriginalExpression )
                    << "  " << result.getExpressionInMacro() << '\n';
         }
     }
     void printReconstructedExpression() const {
+        if ( result.hasCustomMessage() ) {
+            return;
+        }
         if (result.hasExpandedExpression()) {
             stream << "with expansion:\n";
             stream << colourImpl->guardColour( Colour::ReconstructedExpression )
@@ -168,14 +177,12 @@ private:
         }
     }
     void printMessage() const {
-        if (result.hasCustomMessage()) {
-            stream << "Custom Message:" << '\n';
-            stream << TextFlow::Column(result.getCustomMessage()).indent(2) << '\n';
-        }
         if (!messageLabel.empty())
             stream << messageLabel << ':' << '\n';
+        if ( result.hasCustomMessage() ) {
+            stream << TextFlow::Column( result.getCustomMessage() ).indent( 2 ) << '\n';
+        }
         for (auto const& msg : messages) {
-            // If this assertion is a warning ignore any INFO messages
             if (printInfoMessages || msg.type != ResultWas::Info)
                 stream << TextFlow::Column(msg.message).indent(2) << '\n';
         }

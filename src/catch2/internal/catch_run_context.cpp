@@ -849,12 +849,8 @@ namespace Catch {
 
         AssertionResult assertionResult{ info, CATCH_MOVE( data ) };
         assertionResult.m_resultData.lazyExpression.m_transientExpression = expr;
-
-        // 如果断言失败，设置自定义消息
-        if (resultType == ResultWas::ExpressionFailed) {
-            ReusableStringStream rss;
-            rss << "Assertion failed: " << info.capturedExpression;
-            assertionResult.setCustomMessage(rss.str());
+        if ( resultType == ResultWas::ExpressionFailed ) {
+            assertionResult.setCustomMessage();
         }
 
         assertionEnded( CATCH_MOVE(assertionResult) );

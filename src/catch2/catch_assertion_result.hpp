@@ -1,4 +1,3 @@
-
 //              Copyright Catch2 Authors
 // Distributed under the Boost Software License, Version 1.0.
 //   (See accompanying file LICENSE.txt or copy at
@@ -43,19 +42,18 @@ namespace Catch {
         ResultWas::OfType getResultType() const;
         bool hasExpression() const;
         bool hasMessage() const;
+        bool hasCustomMessage() const;
+        void setCustomMessage();
         std::string getExpression() const;
         std::string getExpressionInMacro() const;
         bool hasExpandedExpression() const;
         std::string getExpandedExpression() const;
         StringRef getMessage() const;
+        StringRef getCustomMessage() const;
         SourceLineInfo getSourceInfo() const;
         StringRef getTestMacroName() const;
-        
-        bool hasCustomMessage() const;
-        StringRef getCustomMessage() const;
-        void setCustomMessage(std::string const& message);
 
-    // protected:
+    //protected:
         AssertionInfo m_info;
         AssertionResultData m_resultData;
     };
