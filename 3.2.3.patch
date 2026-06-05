@@ -1,0 +1,29 @@
+diff --git a/3.2.2.patch b/3.2.2.patch
+new file mode 100644
+index 00000000..08fbe3a4
+--- /dev/null
++++ b/3.2.2.patch
+@@ -0,0 +1,19 @@
++#include <catch2/catch_test_macros.hpp>
++#include <catch2/internal/catch_textflow.hpp>
++
++TEST_CASE(
++    "TextFlow::AnsiSkippingString::substring returns empty string for invalid iterator range",
++    "[TextFlow][ansiskippingstring][regression]" ) {
++    Catch::TextFlow::AnsiSkippingString text( "abc" );
++
++    auto validEnd = text.begin();
++    ++validEnd; // points to 'b'
++
++    auto invalidStart = validEnd;
++    ++invalidStart; // points to 'c', so invalidStart > validEnd
++
++    // 边界条件：传入一个非法半开区间 [invalidStart, validEnd)，
++    // 即起始迭代器位于结束迭代器之后。这里应避免因距离计算产生下溢，
++    // 并安全返回空结果。
++    REQUIRE( text.substring( invalidStart, validEnd ).empty() );
++}
+\ No newline at end of file
+diff --git a/3.2.3.patch b/3.2.3.patch
+new file mode 100644
+index 00000000..e69de29b
