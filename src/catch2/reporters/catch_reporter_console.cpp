@@ -168,6 +168,10 @@ private:
         }
     }
     void printMessage() const {
+        if (result.hasCustomMessage()) {
+            stream << "Custom Message:" << '\n';
+            stream << TextFlow::Column(result.getCustomMessage()).indent(2) << '\n';
+        }
         if (!messageLabel.empty())
             stream << messageLabel << ':' << '\n';
         for (auto const& msg : messages) {

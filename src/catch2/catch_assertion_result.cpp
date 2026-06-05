@@ -99,7 +99,19 @@ namespace Catch {
     }
 
     StringRef AssertionResult::getTestMacroName() const {
-        return m_info.macroName;
-    }
+            return m_info.macroName;
+        }
+        
+        bool AssertionResult::hasCustomMessage() const {
+            return !m_resultData.customMessage.empty();
+        }
+        
+        StringRef AssertionResult::getCustomMessage() const {
+            return m_resultData.customMessage;
+        }
+        
+        void AssertionResult::setCustomMessage(std::string const& message) {
+            m_resultData.customMessage = message;
+        }
 
 } // end namespace Catch
