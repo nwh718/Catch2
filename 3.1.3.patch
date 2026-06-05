@@ -1,0 +1,19 @@
+diff --git a/src/catch2/benchmark/detail/catch_stats.cpp b/src/catch2/benchmark/detail/catch_stats.cpp
+index 2a5a2e03..34402f74 100644
+--- a/src/catch2/benchmark/detail/catch_stats.cpp
++++ b/src/catch2/benchmark/detail/catch_stats.cpp
+@@ -38,10 +38,13 @@ namespace Catch {
+                           double const* first,
+                           double const* last,
+                           Estimator& estimator ) {
++                    sample out;
++                    if (last <= first) {
++                        return out;
++                    }
+                     auto n = static_cast<size_t>( last - first );
+                     Catch::uniform_integer_distribution<size_t> dist( 0, n - 1 );
+ 
+-                    sample out;
+                     out.reserve( resamples );
+                     std::vector<double> resampled;
+                     resampled.reserve( n );

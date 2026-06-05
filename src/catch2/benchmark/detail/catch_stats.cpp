@@ -38,10 +38,13 @@ namespace Catch {
                           double const* first,
                           double const* last,
                           Estimator& estimator ) {
+                    sample out;
+                    if (last <= first) {
+                        return out;
+                    }
                     auto n = static_cast<size_t>( last - first );
                     Catch::uniform_integer_distribution<size_t> dist( 0, n - 1 );
 
-                    sample out;
                     out.reserve( resamples );
                     std::vector<double> resampled;
                     resampled.reserve( n );
