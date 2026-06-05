@@ -1,4 +1,3 @@
-
 //              Copyright Catch2 Authors
 // Distributed under the Boost Software License, Version 1.0.
 //   (See accompanying file LICENSE.txt or copy at
@@ -8,7 +7,6 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/internal/catch_enforce.hpp>
 #include <catch2/internal/catch_reusable_string_stream.hpp>
-
 #include <cmath>
 #include <limits>
 
@@ -20,7 +18,13 @@ bool marginComparison(double lhs, double rhs, double margin) {
     return (lhs + margin >= rhs) && (rhs + margin >= lhs);
 }
 
+// Computes the scaled (relative) margin for Approx comparison:
+//   epsilon * (scale + |value|), treating infinity as 0
+double computeScaledMargin(double epsilon, double scale, double value) {
+    return epsilon * (scale + std::fabs(std::isinf(value) ? 0 : value));
 }
+
+} // end anonymous namespace
 
 namespace Catch {
 
@@ -52,7 +56,7 @@ namespace Catch {
         // First try with fixed margin, then compute margin based on epsilon, scale and Approx's value
         // Thanks to Richard Harris for his help refining the scaled margin value
         return marginComparison(m_value, other, m_margin)
-            || marginComparison(m_value, other, m_epsilon * (m_scale + std::fabs(std::isinf(m_value)? 0 : m_value)));
+            || marginComparison(m_value, other, computeScaledMargin(m_epsilon, m_scale, m_value));
     }
 
     void Approx::setMargin(double newMargin) {
