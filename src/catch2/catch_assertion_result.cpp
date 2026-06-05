@@ -94,6 +94,15 @@ namespace Catch {
     StringRef AssertionResult::getMessage() const {
         return m_resultData.message;
     }
+
+    StringRef AssertionResult::getCustomMessage() const {
+        return m_resultData.customMessage;
+    }
+
+    void AssertionResult::setCustomMessage(std::string&& msg) {
+        m_resultData.customMessage = CATCH_MOVE(msg);
+    }
+
     SourceLineInfo AssertionResult::getSourceInfo() const {
         return m_info.lineInfo;
     }
@@ -102,4 +111,3 @@ namespace Catch {
         return m_info.macroName;
     }
 
-} // end namespace Catch

@@ -1,0 +1,168 @@
+diff --git a/src/catch2/catch_assertion_result.cpp b/src/catch2/catch_assertion_result.cpp
+index dba86229..086e8b1d 100644
+--- a/src/catch2/catch_assertion_result.cpp
++++ b/src/catch2/catch_assertion_result.cpp
+@@ -94,6 +94,15 @@ namespace Catch {
+     StringRef AssertionResult::getMessage() const {
+         return m_resultData.message;
+     }
++
++    StringRef AssertionResult::getCustomMessage() const {
++        return m_resultData.customMessage;
++    }
++
++    void AssertionResult::setCustomMessage(std::string&& msg) {
++        m_resultData.customMessage = CATCH_MOVE(msg);
++    }
++
+     SourceLineInfo AssertionResult::getSourceInfo() const {
+         return m_info.lineInfo;
+     }
+@@ -102,4 +111,3 @@ namespace Catch {
+         return m_info.macroName;
+     }
+ 
+-} // end namespace Catch
+diff --git a/src/catch2/catch_assertion_result.hpp b/src/catch2/catch_assertion_result.hpp
+index 48882876..eb5ce2fa 100644
+--- a/src/catch2/catch_assertion_result.hpp
++++ b/src/catch2/catch_assertion_result.hpp
+@@ -25,10 +25,10 @@ namespace Catch {
+         AssertionResultData( ResultWas::OfType _resultType, LazyExpression const& _lazyExpression );
+ 
+         std::string message;
++        std::string customMessage;
+         mutable std::string reconstructedExpression;
+         LazyExpression lazyExpression;
+         ResultWas::OfType resultType;
+-
+         std::string reconstructExpression() const;
+     };
+ 
+@@ -47,14 +47,9 @@ namespace Catch {
+         bool hasExpandedExpression() const;
+         std::string getExpandedExpression() const;
+         StringRef getMessage() const;
++        StringRef getCustomMessage() const;
++        void setCustomMessage(std::string&& msg);
+         SourceLineInfo getSourceInfo() const;
+         StringRef getTestMacroName() const;
+ 
+     //protected:
+-        AssertionInfo m_info;
+-        AssertionResultData m_resultData;
+-    };
+-
+-} // end namespace Catch
+-
+-#endif // CATCH_ASSERTION_RESULT_HPP_INCLUDED
+diff --git a/src/catch2/internal/catch_assertion_handler.cpp b/src/catch2/internal/catch_assertion_handler.cpp
+index 79d5dcd8..7d0961a2 100644
+--- a/src/catch2/internal/catch_assertion_handler.cpp
++++ b/src/catch2/internal/catch_assertion_handler.cpp
+@@ -14,14 +14,8 @@
+ #include <catch2/internal/catch_run_context.hpp>
+ #include <catch2/internal/catch_test_failure_exception.hpp>
+ #include <catch2/matchers/catch_matchers_string.hpp>
+-
+ namespace Catch {
+ 
+-    void AssertionHandler::finishIncomplete() {
+-        m_resultCapture.handleIncomplete( m_assertionInfo );
+-    }
+-
+-    AssertionHandler::AssertionHandler
+         (   StringRef macroName,
+             SourceLineInfo const& lineInfo,
+             StringRef capturedExpression,
+@@ -39,19 +33,9 @@ namespace Catch {
+         m_resultCapture.handleMessage( m_assertionInfo, resultType, CATCH_MOVE(message), m_reaction );
+     }
+ 
+-    auto AssertionHandler::allowThrows() const -> bool {
+-        return getCurrentContext().getConfig()->allowThrows();
+-    }
+-
+-    void AssertionHandler::complete() {
+         m_completed = true;
+         if( m_reaction.shouldDebugBreak ) {
+ 
+-            // If you find your debugger stopping you here then go one level up on the
+-            // call-stack for the code that caused it (typically a failed assertion)
+-
+-            // (To go back to the test and change execution, jump over the throw, next)
+-            CATCH_BREAK_INTO_DEBUGGER();
+         }
+         if (m_reaction.shouldThrow) {
+             throw_test_failure_exception();
+diff --git a/src/catch2/internal/catch_run_context.cpp b/src/catch2/internal/catch_run_context.cpp
+index a435170f..8df1708b 100644
+--- a/src/catch2/internal/catch_run_context.cpp
++++ b/src/catch2/internal/catch_run_context.cpp
+@@ -233,22 +233,6 @@ namespace Catch {
+         // clear there for performance reasons.
+         static CATCH_INTERNAL_THREAD_LOCAL bool g_clearMessageScopes = false;
+ 
+-
+-        // Holds the data for both scoped and unscoped messages together,
+-        // to avoid issues where their lifetimes start in wrong order,
+-        // and then are destroyed in wrong order.
+-        class MessageHolder {
+-            // The actual message vector passed to the reporters
+-            std::vector<MessageInfo> messages;
+-            // IDs of messages from UNSCOPED_X macros, which we have to
+-            // remove manually.
+-            std::vector<unsigned int> unscoped_ids;
+-
+-        public:
+-            // We do not need to special-case the unscoped messages when
+-            // we only keep around the raw msg ids.
+-            ~MessageHolder() = default;
+-
+             void addUnscopedMessage( MessageInfo&& info ) {
+                 repairUnscopedMessageInvariant();
+                 unscoped_ids.push_back( info.sequence );
+@@ -489,10 +473,6 @@ namespace Catch {
+         // Reset working state. assertion info will be reset after
+         // populateReaction is run if it is needed
+         m_lastResult = CATCH_MOVE( result );
+-    }
+-
+-    void RunContext::notifyAssertionStarted( AssertionInfo const& info ) {
+-        if (m_reportAssertionStarting) {
+             Detail::LockGuard lock( m_assertionMutex );
+             auto _ = scopedDeactivate( *m_outputRedirect );
+             m_reporter->assertionStarting( info );
+@@ -850,6 +830,10 @@ namespace Catch {
+         AssertionResult assertionResult{ info, CATCH_MOVE( data ) };
+         assertionResult.m_resultData.lazyExpression.m_transientExpression = expr;
+ 
++        if ( resultType == ResultWas::ExpressionFailed ) {
++            assertionResult.setCustomMessage( "Custom assertion failure: " + std::string( info.capturedExpression ) + " failed at " + info.lineInfo.file + ":" + std::to_string( info.lineInfo.line ) );
++        }
++
+         assertionEnded( CATCH_MOVE(assertionResult) );
+     }
+ 
+diff --git a/src/catch2/reporters/catch_reporter_console.cpp b/src/catch2/reporters/catch_reporter_console.cpp
+index acb4ae8e..b1927fa5 100644
+--- a/src/catch2/reporters/catch_reporter_console.cpp
++++ b/src/catch2/reporters/catch_reporter_console.cpp
+@@ -163,11 +163,15 @@ private:
+             stream << "with expansion:\n";
+             stream << colourImpl->guardColour( Colour::ReconstructedExpression )
+                    << TextFlow::Column( result.getExpandedExpression() )
+-                          .indent( 2 )
+-                   << '\n';
++                          .indent( 2 ) << '\n';
+         }
+     }
+     void printMessage() const {
++        auto customMsg = result.getCustomMessage();
++        if ( !customMsg.empty() ) {
++            stream << "with custom message:\n";
++            stream << TextFlow::Column( static_cast<std::string>( customMsg ) ).indent(2) << '\n';
++        }
+         if (!messageLabel.empty())
+             stream << messageLabel << ':' << '\n';
+         for (auto const& msg : messages) {

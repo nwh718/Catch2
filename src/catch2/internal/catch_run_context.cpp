@@ -233,22 +233,6 @@ namespace Catch {
         // clear there for performance reasons.
         static CATCH_INTERNAL_THREAD_LOCAL bool g_clearMessageScopes = false;
 
-
-        // Holds the data for both scoped and unscoped messages together,
-        // to avoid issues where their lifetimes start in wrong order,
-        // and then are destroyed in wrong order.
-        class MessageHolder {
-            // The actual message vector passed to the reporters
-            std::vector<MessageInfo> messages;
-            // IDs of messages from UNSCOPED_X macros, which we have to
-            // remove manually.
-            std::vector<unsigned int> unscoped_ids;
-
-        public:
-            // We do not need to special-case the unscoped messages when
-            // we only keep around the raw msg ids.
-            ~MessageHolder() = default;
-
             void addUnscopedMessage( MessageInfo&& info ) {
                 repairUnscopedMessageInvariant();
                 unscoped_ids.push_back( info.sequence );
@@ -489,10 +473,6 @@ namespace Catch {
         // Reset working state. assertion info will be reset after
         // populateReaction is run if it is needed
         m_lastResult = CATCH_MOVE( result );
-    }
-
-    void RunContext::notifyAssertionStarted( AssertionInfo const& info ) {
-        if (m_reportAssertionStarting) {
             Detail::LockGuard lock( m_assertionMutex );
             auto _ = scopedDeactivate( *m_outputRedirect );
             m_reporter->assertionStarting( info );
@@ -849,6 +829,10 @@ namespace Catch {
 
         AssertionResult assertionResult{ info, CATCH_MOVE( data ) };
         assertionResult.m_resultData.lazyExpression.m_transientExpression = expr;
+
+        if ( resultType == ResultWas::ExpressionFailed ) {
+            assertionResult.setCustomMessage( "Custom assertion failure: " + std::string( info.capturedExpression ) + " failed at " + info.lineInfo.file + ":" + std::to_string( info.lineInfo.line ) );
+        }
 
         assertionEnded( CATCH_MOVE(assertionResult) );
     }

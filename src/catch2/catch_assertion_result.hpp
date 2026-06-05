@@ -25,10 +25,10 @@ namespace Catch {
         AssertionResultData( ResultWas::OfType _resultType, LazyExpression const& _lazyExpression );
 
         std::string message;
+        std::string customMessage;
         mutable std::string reconstructedExpression;
         LazyExpression lazyExpression;
         ResultWas::OfType resultType;
-
         std::string reconstructExpression() const;
     };
 
@@ -47,14 +47,9 @@ namespace Catch {
         bool hasExpandedExpression() const;
         std::string getExpandedExpression() const;
         StringRef getMessage() const;
+        StringRef getCustomMessage() const;
+        void setCustomMessage(std::string&& msg);
         SourceLineInfo getSourceInfo() const;
         StringRef getTestMacroName() const;
 
     //protected:
-        AssertionInfo m_info;
-        AssertionResultData m_resultData;
-    };
-
-} // end namespace Catch
-
-#endif // CATCH_ASSERTION_RESULT_HPP_INCLUDED

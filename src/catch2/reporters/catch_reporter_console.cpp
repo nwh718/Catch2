@@ -163,11 +163,15 @@ private:
             stream << "with expansion:\n";
             stream << colourImpl->guardColour( Colour::ReconstructedExpression )
                    << TextFlow::Column( result.getExpandedExpression() )
-                          .indent( 2 )
-                   << '\n';
+                          .indent( 2 ) << '\n';
         }
     }
     void printMessage() const {
+        auto customMsg = result.getCustomMessage();
+        if ( !customMsg.empty() ) {
+            stream << "with custom message:\n";
+            stream << TextFlow::Column( static_cast<std::string>( customMsg ) ).indent(2) << '\n';
+        }
         if (!messageLabel.empty())
             stream << messageLabel << ':' << '\n';
         for (auto const& msg : messages) {
