@@ -95,9 +95,6 @@ namespace Catch {
             }
         }
         assert(openings.empty() && "Mismatched openings");
-        m_messages.emplace_back(macroName, lineInfo, resultType);
-        m_messages.back().message += trimmed(start, names.size() - 1);
-        m_messages.back().message += " := "_sr;
     }
     Capturer::~Capturer() {
         assert( m_captured == m_messages.size() );
