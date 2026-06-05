@@ -27,6 +27,12 @@ namespace Catch {
         bool directCompare( float lhs, float rhs );
         bool directCompare( double lhs, double rhs );
 
+        // Performs equivalent check of std::fabs(lhs - rhs) <= margin
+        // But without the subtraction to allow for INFINITY in comparison
+        inline bool marginComparison(double lhs, double rhs, double margin) {
+            return (lhs + margin >= rhs) && (rhs + margin >= lhs);
+        }
+
     } // end namespace Detail
 
 

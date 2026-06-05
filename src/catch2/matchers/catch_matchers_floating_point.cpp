@@ -47,12 +47,6 @@ FP step(FP start, FP direction, uint64_t steps) {
     return start;
 }
 
-// Performs equivalent check of std::fabs(lhs - rhs) <= margin
-// But without the subtraction to allow for INFINITY in comparison
-bool marginComparison(double lhs, double rhs, double margin) {
-    return (lhs + margin >= rhs) && (rhs + margin >= lhs);
-}
-
 template <typename FloatingPoint>
 void write(std::ostream& out, FloatingPoint num) {
     out << std::scientific
@@ -82,7 +76,7 @@ namespace Detail {
     // Performs equivalent check of std::fabs(lhs - rhs) <= margin
     // But without the subtraction to allow for INFINITY in comparison
     bool WithinAbsMatcher::match(double const& matchee) const {
-        return (matchee + m_margin >= m_target) && (m_target + m_margin >= matchee);
+        return Catch::Detail::marginComparison(matchee, m_target, m_margin);
     }
 
     std::string WithinAbsMatcher::describe() const {
@@ -170,7 +164,7 @@ namespace Detail {
 
     bool WithinRelMatcher::match(double const& matchee) const {
         const auto relMargin = m_epsilon * (std::max)(std::fabs(matchee), std::fabs(m_target));
-        return marginComparison(matchee, m_target,
+        return Catch::Detail::marginComparison(matchee, m_target,
                                 std::isinf(relMargin)? 0 : relMargin);
     }
 
