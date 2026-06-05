@@ -20,6 +20,15 @@ bool marginComparison(double lhs, double rhs, double margin) {
     return (lhs + margin >= rhs) && (rhs + margin >= lhs);
 }
 
+double scaledMargin(double value, double scale, double epsilon) {
+    return epsilon * (scale + (std::isinf(value) ? 0.0 : std::fabs(value)));
+}
+
+bool approxEqual(double lhs, double rhs, double margin, double epsilon, double scale) {
+    return marginComparison(lhs, rhs, margin)
+        || marginComparison(lhs, rhs, scaledMargin(lhs, scale, epsilon));
+}
+
 }
 
 namespace Catch {
@@ -51,8 +60,7 @@ namespace Catch {
     bool Approx::equalityComparisonImpl(const double other) const {
         // First try with fixed margin, then compute margin based on epsilon, scale and Approx's value
         // Thanks to Richard Harris for his help refining the scaled margin value
-        return marginComparison(m_value, other, m_margin)
-            || marginComparison(m_value, other, m_epsilon * (m_scale + std::fabs(std::isinf(m_value)? 0 : m_value)));
+        return approxEqual(m_value, other, m_margin, m_epsilon, m_scale);
     }
 
     void Approx::setMargin(double newMargin) {

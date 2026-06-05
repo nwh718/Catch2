@@ -1,3 +1,74 @@
-diff --git a/3.5.1.patch b/3.5.1.patch
-new file mode 100644
-index 00000000..e69de29b
+
+diff --git a/src/catch2/catch_approx.cpp b/src/catch2/catch_approx.cpp
+index 08c6799b..ce360fc4 100644
+--- a/src/catch2/catch_approx.cpp
++++ b/src/catch2/catch_approx.cpp
+@@ -55,6 +55,22 @@ namespace Catch {
+             || marginComparison(m_value, other, m_epsilon * (m_scale + std::fabs(std::isinf(m_value)? 0 : m_value)));
+     }
+ 
++    bool Approx::lessThanOrEqualImpl(double lhs) const {
++        return lhs < m_value || equalityComparisonImpl(lhs);
++    }
++
++    bool Approx::lessThanOrEqualImplRight(double rhs) const {
++        return m_value < rhs || equalityComparisonImpl(rhs);
++    }
++
++    bool Approx::greaterThanOrEqualImpl(double lhs) const {
++        return lhs > m_value || equalityComparisonImpl(lhs);
++    }
++
++    bool Approx::greaterThanOrEqualImplRight(double rhs) const {
++        return m_value > rhs || equalityComparisonImpl(rhs);
++    }
++
+     void Approx::setMargin(double newMargin) {
+         CATCH_ENFORCE(newMargin >= 0,
+             "Invalid Approx::margin: " << newMargin << '.'
+diff --git a/src/catch2/catch_approx.hpp b/src/catch2/catch_approx.hpp
+index de4d2ab4..9a9a7f3e 100644
+--- a/src/catch2/catch_approx.hpp
++++ b/src/catch2/catch_approx.hpp
+@@ -21,6 +21,14 @@ namespace Catch {
+         void setMargin(double margin);
+         // Sets and validates the new epsilon (0 < epsilon < 1)
+         void setEpsilon(double epsilon);
++        // Helper for <= comparison with T on left
++        bool lessThanOrEqualImpl(double lhs) const;
++        // Helper for <= comparison with Approx on left
++        bool lessThanOrEqualImplRight(double rhs) const;
++        // Helper for >= comparison with T on left
++        bool greaterThanOrEqualImpl(double lhs) const;
++        // Helper for >= comparison with Approx on left
++        bool greaterThanOrEqualImplRight(double rhs) const;
+ 
+     public:
+         explicit Approx ( double value );
+@@ -66,22 +74,22 @@ namespace Catch {
+ 
+         template <typename T, typename = std::enable_if_t<std::is_constructible<double, T>::value>>
+         friend bool operator <= ( T const& lhs, Approx const& rhs ) {
+-            return static_cast<double>(lhs) < rhs.m_value || lhs == rhs;
++            return rhs.lessThanOrEqualImpl(static_cast<double>(lhs));
+         }
+ 
+         template <typename T, typename = std::enable_if_t<std::is_constructible<double, T>::value>>
+         friend bool operator <= ( Approx const& lhs, T const& rhs ) {
+-            return lhs.m_value < static_cast<double>(rhs) || lhs == rhs;
++            return lhs.lessThanOrEqualImplRight(static_cast<double>(rhs));
+         }
+ 
+         template <typename T, typename = std::enable_if_t<std::is_constructible<double, T>::value>>
+         friend bool operator >= ( T const& lhs, Approx const& rhs ) {
+-            return static_cast<double>(lhs) > rhs.m_value || lhs == rhs;
++            return rhs.greaterThanOrEqualImpl(static_cast<double>(lhs));
+         }
+ 
+         template <typename T, typename = std::enable_if_t<std::is_constructible<double, T>::value>>
+         friend bool operator >= ( Approx const& lhs, T const& rhs ) {
+-            return lhs.m_value > static_cast<double>(rhs) || lhs == rhs;
++            return lhs.greaterThanOrEqualImplRight(static_cast<double>(rhs));
+         }
+ 
+         template <typename T, typename = std::enable_if_t<std::is_constructible<double, T>::value>>
