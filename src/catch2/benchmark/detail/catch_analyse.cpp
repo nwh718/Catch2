@@ -58,15 +58,20 @@ namespace Catch {
                     };
                 } else {
                     std::vector<FDuration> samples;
-                    samples.reserve(static_cast<size_t>(last - first));
+                    auto count = static_cast<size_t>(last - first);
+                    samples.reserve(count);
 
                     FDuration mean = FDuration(0);
                     int i = 0;
-                    for (auto it = first; it < last; ++it, ++i) {
-                        samples.push_back(*it);
-                        mean += *it;
+                    if (count == 0) {
+                        mean = FDuration(0);
+                    } else {
+                        for (auto it = first; it < last; ++it, ++i) {
+                            samples.push_back(*it);
+                            mean += *it;
+                        }
+                        mean /= i;
                     }
-                    mean /= i;
 
                     return SampleAnalysis{
                         CATCH_MOVE(samples),

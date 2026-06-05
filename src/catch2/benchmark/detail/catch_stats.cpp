@@ -39,8 +39,8 @@ namespace Catch {
                           double const* last,
                           Estimator& estimator ) {
                     auto n = static_cast<size_t>( last - first );
+                    if ( n == 0 ) { return {}; }
                     Catch::uniform_integer_distribution<size_t> dist( 0, n - 1 );
-
                     sample out;
                     out.reserve( resamples );
                     std::vector<double> resampled;
@@ -186,6 +186,7 @@ namespace Catch {
                                                                 double const* ),
                                          double* first,
                                          double* last ) {
+                    if ( first == last ) { return {}; }
                     const auto second = first + 1;
                     sample results;
                     results.reserve( static_cast<size_t>( last - first ) );
@@ -213,6 +214,7 @@ namespace Catch {
                                               double* first,
                                               double* last ) {
                 auto count = last - first;
+                if ( count == 0 ) { return 0.0; }
                 double idx = static_cast<double>((count - 1) * k) / static_cast<double>(q);
                 int j = static_cast<int>(idx);
                 double g = idx - j;
@@ -228,6 +230,7 @@ namespace Catch {
 
             OutlierClassification
             classify_outliers( double const* first, double const* last ) {
+                if ( first == last ) { return {}; }
                 std::vector<double> copy( first, last );
 
                 auto q1 = weighted_average_quantile( 1, 4, copy.data(), copy.data() + copy.size() );
@@ -257,6 +260,7 @@ namespace Catch {
 
             double mean( double const* first, double const* last ) {
                 auto count = last - first;
+                if ( count == 0 ) { return 0.; }
                 double sum = 0.;
                 while (first != last) {
                     sum += *first;
@@ -299,7 +303,7 @@ namespace Catch {
 
                 double point = estimator( first, last );
                 // Degenerate case with a single sample
-                if ( n_samples == 1 )
+                if ( n_samples <= 1 )
                     return { point, point, point, confidence_level };
 
                 sample jack = jackknife( estimator, first, last );
@@ -384,6 +388,11 @@ namespace Catch {
 #endif // CATCH_USE_ASYNC
 
                 auto n = static_cast<int>(last - first); // seriously, one can't use integral types without hell in C++
+                if ( n == 0 ) {
+                    return { Estimate<double>{ 0., 0., 0., confidence_level },
+                             Estimate<double>{ 0., 0., 0., confidence_level },
+                             0. };
+                }
                 double outlier_variance = Detail::outlier_variance(mean_estimate, stddev_estimate, n);
 
                 return { mean_estimate, stddev_estimate, outlier_variance };
