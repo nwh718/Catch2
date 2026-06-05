@@ -80,6 +80,9 @@ namespace Catch {
     }
 
     std::string serializeFilters( std::vector<std::string> const& filters ) {
+        if (filters.empty()) {
+            return {};
+        }
         // We add a ' ' separator between each filter
         size_t serialized_size = filters.size() - 1;
         for (auto const& filter : filters) {

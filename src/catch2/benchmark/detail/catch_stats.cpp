@@ -39,6 +39,9 @@ namespace Catch {
                           double const* last,
                           Estimator& estimator ) {
                     auto n = static_cast<size_t>( last - first );
+                    if (n == 0) {
+                        return {};
+                    }
                     Catch::uniform_integer_distribution<size_t> dist( 0, n - 1 );
 
                     sample out;

@@ -1,0 +1,42 @@
+diff --git a/src/catch2/benchmark/detail/catch_stats.cpp b/src/catch2/benchmark/detail/catch_stats.cpp
+index 2a5a2e03..d3edbc92 100644
+--- a/src/catch2/benchmark/detail/catch_stats.cpp
++++ b/src/catch2/benchmark/detail/catch_stats.cpp
+@@ -39,6 +39,9 @@ namespace Catch {
+                           double const* last,
+                           Estimator& estimator ) {
+                     auto n = static_cast<size_t>( last - first );
++                    if (n == 0) {
++                        return {};
++                    }
+                     Catch::uniform_integer_distribution<size_t> dist( 0, n - 1 );
+ 
+                     sample out;
+diff --git a/src/catch2/catch_message.cpp b/src/catch2/catch_message.cpp
+index 3a83e34e..5c3aea3b 100644
+--- a/src/catch2/catch_message.cpp
++++ b/src/catch2/catch_message.cpp
+@@ -95,6 +95,9 @@ namespace Catch {
+             }
+         }
+         assert(openings.empty() && "Mismatched openings");
++        if (names.empty()) {
++            return;
++        }
+         m_messages.emplace_back(macroName, lineInfo, resultType);
+         m_messages.back().message += trimmed(start, names.size() - 1);
+         m_messages.back().message += " := "_sr;
+diff --git a/src/catch2/reporters/catch_reporter_helpers.cpp b/src/catch2/reporters/catch_reporter_helpers.cpp
+index 0044efb5..2a2b2ecb 100644
+--- a/src/catch2/reporters/catch_reporter_helpers.cpp
++++ b/src/catch2/reporters/catch_reporter_helpers.cpp
+@@ -80,6 +80,9 @@ namespace Catch {
+     }
+ 
+     std::string serializeFilters( std::vector<std::string> const& filters ) {
++        if (filters.empty()) {
++            return {};
++        }
+         // We add a ' ' separator between each filter
+         size_t serialized_size = filters.size() - 1;
+         for (auto const& filter : filters) {
