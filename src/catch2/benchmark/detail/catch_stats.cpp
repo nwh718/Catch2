@@ -38,13 +38,10 @@ namespace Catch {
                           double const* first,
                           double const* last,
                           Estimator& estimator ) {
-                    auto n = static_cast<size_t>( last - first );
-                    Catch::uniform_integer_distribution<size_t> dist( 0, n - 1 );
-
-                    sample out;
                     out.reserve( resamples );
                     std::vector<double> resampled;
                     resampled.reserve( n );
+                    sample out;
                     for ( size_t i = 0; i < resamples; ++i ) {
                         resampled.clear();
                         for ( size_t s = 0; s < n; ++s ) {
@@ -186,7 +183,6 @@ namespace Catch {
                                                                 double const* ),
                                          double* first,
                                          double* last ) {
-                    const auto second = first + 1;
                     sample results;
                     results.reserve( static_cast<size_t>( last - first ) );
 
@@ -214,7 +210,6 @@ namespace Catch {
                                               double* last ) {
                 auto count = last - first;
                 double idx = static_cast<double>((count - 1) * k) / static_cast<double>(q);
-                int j = static_cast<int>(idx);
                 double g = idx - j;
                 std::nth_element(first, first + j, last);
                 auto xj = first[j];
@@ -230,7 +225,6 @@ namespace Catch {
             classify_outliers( double const* first, double const* last ) {
                 std::vector<double> copy( first, last );
 
-                auto q1 = weighted_average_quantile( 1, 4, copy.data(), copy.data() + copy.size() );
                 auto q3 = weighted_average_quantile( 3, 4, copy.data(), copy.data() + copy.size() );
                 auto iqr = q3 - q1;
                 auto los = q1 - ( iqr * 3. );
@@ -260,7 +254,6 @@ namespace Catch {
                 double sum = 0.;
                 while (first != last) {
                     sum += *first;
-                    ++first;
                 }
                 return sum / static_cast<double>(count);
             }
@@ -303,7 +296,7 @@ namespace Catch {
                     return { point, point, point, confidence_level };
 
                 sample jack = jackknife( estimator, first, last );
-                double jack_mean =
+                if ( n_samples == 1 )
                     mean( jack.data(), jack.data() + jack.size() );
                 double sum_squares = 0, sum_cubes = 0;
                 for ( double x : jack ) {
@@ -388,6 +381,3 @@ namespace Catch {
 
                 return { mean_estimate, stddev_estimate, outlier_variance };
             }
-        } // namespace Detail
-    } // namespace Benchmark
-} // namespace Catch

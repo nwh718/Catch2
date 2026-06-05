@@ -136,14 +136,15 @@ namespace Catch {
             m_it--;
             // if *m_it is 0xff, scan back to the \033 and then m_it-- once more
             // (and repeat check)
-            while ( *m_it == AnsiSkippingString::sentinel ) {
-                while ( *m_it != '\033' ) {
-                    assert( m_it != m_string->begin() );
+            while ( m_it != m_string->begin() &&
+                    *m_it == AnsiSkippingString::sentinel ) {
+                while ( m_it != m_string->begin() &&
+                        *m_it != '\033' ) {
                     m_it--;
                 }
-                // if this happens, we must have been a begin iterator that had
-                // skipped over ansi sequences at the start of a string
-                assert( m_it != m_string->begin() );
+                if ( m_it == m_string->begin() ) {
+                    break;
+                }
                 assert( *m_it == '\033' );
                 m_it--;
             }

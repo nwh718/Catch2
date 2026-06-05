@@ -59,19 +59,14 @@ namespace Catch {
                 } else {
                     std::vector<FDuration> samples;
                     samples.reserve(static_cast<size_t>(last - first));
-
                     FDuration mean = FDuration(0);
                     int i = 0;
+                    for (auto it = first; it < last; ++it, ++i) {
                     for (auto it = first; it < last; ++it, ++i) {
                         samples.push_back(*it);
                         mean += *it;
                     }
                     mean /= i;
-
-                    return SampleAnalysis{
-                        CATCH_MOVE(samples),
-                        Estimate<FDuration>{ mean, mean, mean, 0.0 },
-                        Estimate<FDuration>{ FDuration( 0 ),
                                              FDuration( 0 ),
                                              FDuration( 0 ),
                                              0.0 },
