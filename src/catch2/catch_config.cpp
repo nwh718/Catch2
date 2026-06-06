@@ -222,6 +222,50 @@ namespace Catch {
     unsigned int Config::benchmarkResamples() const               { return m_data.benchmarkResamples; }
     std::chrono::milliseconds Config::benchmarkWarmupTime() const { return std::chrono::milliseconds(m_data.benchmarkWarmupTime); }
 
+    bool Config::matchesPathFilter(StringRef path) const {
+        // 如果没有设置路径过滤器，或者不使用新的过滤行为，则始终匹配
+        if (m_data.pathFilters.empty() || !m_data.useNewPathFilteringBehaviour) {
+            return true;
+        }
+
+        // 解析传入的路径（格式类似 "c:section1/g:2/c:section2"）
+        std::vector<PathFilter> parsedPath;
+        size_t start = 0;
+        while (start < path.size()) {
+            size_t end = path.find('/', start);
+            if (end == StringRef::npos) {
+                end = path.size();
+            }
+            StringRef component = path.substr(start, end - start);
+            if (component.size() >= 3) {
+                // 检查前缀 "g:" 或 "c:"（手动实现，避免依赖缺失的 StringRef 重载）
+                if (component[0] == 'g' && component[1] == ':') {
+                    parsedPath.emplace_back(PathFilter::For::Generator,
+                                            static_cast<std::string>(component.substr(2)));
+                } else if (component[0] == 'c' && component[1] == ':') {
+                    parsedPath.emplace_back(PathFilter::For::Section,
+                                            static_cast<std::string>(component.substr(2)));
+                }
+            }
+            start = end + 1;
+        }
+
+        // 检查解析后的路径是否是配置的路径过滤器的前缀或完全匹配
+        if (parsedPath.size() > m_data.pathFilters.size()) {
+            return false;
+        }
+        for (size_t i = 0; i < parsedPath.size(); ++i) {
+            if (parsedPath[i].type != m_data.pathFilters[i].type) {
+                return false;
+            }
+            if (m_data.pathFilters[i].filter != "*" &&
+                parsedPath[i].filter != m_data.pathFilters[i].filter) {
+                return false;
+            }
+        }
+        return true;
+    }
+
     void Config::readBazelEnvVars() {
         // Register a JUnit reporter for Bazel. Bazel sets an environment
         // variable with the path to XML output. If this file is written to
@@ -246,7 +290,7 @@ namespace Catch {
         const auto bazelShardOptions = readBazelShardingOptions();
         if ( bazelShardOptions ) {
             std::ofstream f( bazelShardOptions->shardFilePath,
-                             std::ios_base::out | std::ios_base::trunc );
+                            std::ios_base::out | std::ios_base::trunc );
             if ( f.is_open() ) {
                 f << "";
                 m_data.shardIndex = bazelShardOptions->shardIndex;

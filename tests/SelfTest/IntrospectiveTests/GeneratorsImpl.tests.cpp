@@ -820,6 +820,102 @@ namespace {
     };
 }
 
+TEST_CASE( "RangeGenerator can be skipped forward efficiently",
+           "[generators][range]" ) {
+    using namespace Catch::Generators;
+    RangeGenerator<int> range_gen(0, 1000, 1);
+    REQUIRE( range_gen.get() == 0 );
+
+    range_gen.skipToNthElement( 500 );
+    REQUIRE( range_gen.get() == 500 );
+
+    range_gen.skipToNthElement( 999 );
+    REQUIRE( range_gen.get() == 999 );
+
+    // 跳到超出范围
+    REQUIRE_THROWS( range_gen.skipToNthElement( 1000 ) );
+}
+
+TEST_CASE( "IteratorGenerator can be skipped forward efficiently",
+           "[generators][from-range]" ) {
+    using namespace Catch::Generators;
+    std::vector<int> vec(1000);
+    for (int i = 0; i < 1000; ++i) {
+        vec[i] = i;
+    }
+
+    IteratorGenerator<int> it_gen(vec.begin(), vec.end());
+    REQUIRE( it_gen.get() == 0 );
+
+    it_gen.skipToNthElement( 500 );
+    REQUIRE( it_gen.get() == 500 );
+
+    it_gen.skipToNthElement( 999 );
+    REQUIRE( it_gen.get() == 999 );
+
+    // 跳到超出范围
+    REQUIRE_THROWS( it_gen.skipToNthElement( 1000 ) );
+}
+
+TEST_CASE( "RepeatGenerator can be skipped forward efficiently",
+           "[generators][repeat]" ) {
+    using namespace Catch::Generators;
+
+    // 测试基本重复跳过
+    RepeatGenerator<int> repeat_gen(3, values({1, 2, 3}));
+    REQUIRE( repeat_gen.get() == 1 );
+
+    repeat_gen.skipToNthElement( 4 );
+    REQUIRE( repeat_gen.get() == 2 ); // 第 0:1,1:2,2:3,3:1,4:2
+
+    repeat_gen.skipToNthElement( 8 );
+    REQUIRE( repeat_gen.get() == 3 );
+
+    // 超出范围
+    REQUIRE_THROWS( repeat_gen.skipToNthElement( 9 ) );
+}
+
+TEST_CASE( "统一过滤接口 matchesPathFilter 测试", "[config][filter]" ) {
+    using namespace Catch;
+
+    // 配置数据并初始化 Config
+    ConfigData data;
+    data.useNewPathFilteringBehaviour = true;
+
+    // 添加过滤器
+    data.pathFilters.emplace_back(PathFilter::For::Section, "section1");
+    data.pathFilters.emplace_back(PathFilter::For::Generator, "2");
+    data.pathFilters.emplace_back(PathFilter::For::Section, "subsection");
+
+    Config config(data);
+
+    // 测试匹配的路径
+    REQUIRE(config.matchesPathFilter("c:section1"));
+    REQUIRE(config.matchesPathFilter("c:section1/g:2"));
+    REQUIRE(config.matchesPathFilter("c:section1/g:2/c:subsection"));
+
+    // 测试不匹配的路径
+    REQUIRE_FALSE(config.matchesPathFilter("c:othersection"));
+    REQUIRE_FALSE(config.matchesPathFilter("c:section1/g:3"));
+    REQUIRE_FALSE(config.matchesPathFilter("c:section1/g:2/c:othersubsection"));
+
+    // 测试通配符
+    ConfigData wildcardData;
+    wildcardData.useNewPathFilteringBehaviour = true;
+    wildcardData.pathFilters.emplace_back(PathFilter::For::Section, "section1");
+    wildcardData.pathFilters.emplace_back(PathFilter::For::Generator, "*");
+    wildcardData.pathFilters.emplace_back(PathFilter::For::Section, "subsection");
+
+    Config wildcardConfig(wildcardData);
+    REQUIRE(wildcardConfig.matchesPathFilter("c:section1/g:5"));
+    REQUIRE(wildcardConfig.matchesPathFilter("c:section1/g:5/c:subsection"));
+
+    // 测试无过滤器的情况
+    ConfigData emptyData;
+    Config emptyConfig(emptyData);
+    REQUIRE(emptyConfig.matchesPathFilter("any/path"));
+}
+
 TEST_CASE( "MapGenerator can handle not default constructible types",
            "[generators][map]" ) {
     using namespace Catch::Generators;

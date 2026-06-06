@@ -1,0 +1,246 @@
++diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
++index 0ed64ebf..b4ebd604 100644
++--- a/src/CMakeLists.txt
+++++ b/src/CMakeLists.txt
++@@ -151,7 +151,6 @@ set(IMPL_HEADERS
++   ${SOURCES_DIR}/internal/catch_unique_ptr.hpp
++   ${SOURCES_DIR}/internal/catch_unreachable.hpp
++   ${SOURCES_DIR}/internal/catch_void_type.hpp
++-  ${SOURCES_DIR}/internal/catch_wildcard_pattern.hpp
++   ${SOURCES_DIR}/internal/catch_windows_h_proxy.hpp
++   ${SOURCES_DIR}/internal/catch_xmlwriter.hpp
++ )
++@@ -218,7 +217,6 @@ set(IMPL_SOURCES
++   ${SOURCES_DIR}/internal/catch_test_spec_parser.cpp
++   ${SOURCES_DIR}/internal/catch_textflow.cpp
++   ${SOURCES_DIR}/internal/catch_uncaught_exceptions.cpp
++-  ${SOURCES_DIR}/internal/catch_wildcard_pattern.cpp
++   ${SOURCES_DIR}/internal/catch_xmlwriter.cpp
++ )
++ set(INTERNAL_FILES ${IMPL_SOURCES} ${IMPL_HEADERS})
++diff --git a/src/catch2/internal/catch_wildcard_matcher.cpp b/src/catch2/internal/catch_wildcard_matcher.cpp
++new file mode 100644
++index 00000000..c878eabb
++--- /dev/null
+++++ b/src/catch2/internal/catch_wildcard_matcher.cpp
++@@ -0,0 +1,54 @@
+++//              Copyright Catch2 Authors
+++// Distributed under the Boost Software License, Version 1.0.
+++//   (See accompanying file LICENSE.txt or copy at
+++//        https://www.boost.org/LICENSE_1_0.txt)
+++
+++// SPDX-License-Identifier: BSL-1.0
+++
+++#include <catch2/internal/catch_wildcard_matcher.hpp>
+++
+++#ifdef CATCH_CONFIG_WILDCARD_MATCHER
+++
+++namespace Catch {
+++    namespace Detail {
+++
+++        bool WildcardMatcher::matches( std::string_view input ) const noexcept {
+++            const char* s = input.data();
+++            const char* s_end = s + input.size();
+++            const char* p = m_pattern;
+++            const char* star = nullptr;
+++            const char* ss = s;
+++
+++            while ( s < s_end ) {
+++                if ( ( *p == '?' ) || ( *p == *s ) ) {
+++                    ++s;
+++                    ++p;
+++                    continue;
+++                }
+++
+++                if ( *p == '*' ) {
+++                    star = p++;
+++                    ss = s;
+++                    continue;
+++                }
+++
+++                if ( star ) {
+++                    p = star + 1;
+++                    s = ++ss;
+++                    continue;
+++                }
+++
+++                return false;
+++            }
+++
+++            while ( *p == '*' ) {
+++                ++p;
+++            }
+++
+++            return *p == '\0';
+++        }
+++
+++    } // namespace Detail
+++} // namespace Catch
+++
+++#endif // CATCH_CONFIG_WILDCARD_MATCHER
++\ No newline at end of file
++diff --git a/src/catch2/internal/catch_wildcard_matcher.hpp b/src/catch2/internal/catch_wildcard_matcher.hpp
++new file mode 100644
++index 00000000..3c8f0222
++--- /dev/null
+++++ b/src/catch2/internal/catch_wildcard_matcher.hpp
++@@ -0,0 +1,46 @@
+++//              Copyright Catch2 Authors
+++// Distributed under the Boost Software License, Version 1.0.
+++//   (See accompanying file LICENSE.txt or copy at
+++//        https://www.boost.org/LICENSE_1_0.txt)
+++
+++// SPDX-License-Identifier: BSL-1.0
+++#ifndef CATCH_WILDCARD_MATCHER_HPP_INCLUDED
+++#define CATCH_WILDCARD_MATCHER_HPP_INCLUDED
+++
+++#ifdef CATCH_CONFIG_WILDCARD_MATCHER
+++
+++#include <string_view>
+++
+++namespace Catch {
+++    namespace Detail {
+++
+++        class WildcardMatcher {
+++            static constexpr size_t MaxPatternLength = 1024;
+++
+++        public:
+++            template <size_t N>
+++            explicit constexpr WildcardMatcher( const char (&pattern)[N] ) noexcept;
+++
+++            bool matches( std::string_view input ) const noexcept;
+++
+++        private:
+++            char m_pattern[MaxPatternLength + 1] = {};
+++            size_t m_length = 0;
+++        };
+++
+++        template <size_t N>
+++        constexpr WildcardMatcher::WildcardMatcher( const char (&pattern)[N] ) noexcept {
+++            static_assert( N <= MaxPatternLength + 1,
+++                           "WildcardMatcher: pattern length exceeds maximum of 1024 characters" );
+++            for ( size_t i = 0; i < N; ++i ) {
+++                m_pattern[i] = pattern[i];
+++            }
+++            m_length = N - 1;
+++        }
+++
+++    } // namespace Detail
+++} // namespace Catch
+++
+++#endif // CATCH_CONFIG_WILDCARD_MATCHER
+++
+++#endif // CATCH_WILDCARD_MATCHER_HPP_INCLUDED
++\ No newline at end of file
+diff --git a/src/catch2/internal/catch_wildcard_matcher.cpp b/src/catch2/internal/catch_wildcard_matcher.cpp
+new file mode 100644
+index 00000000..21e895bb
+--- /dev/null
++++ b/src/catch2/internal/catch_wildcard_matcher.cpp
+@@ -0,0 +1,54 @@
++//              Copyright Catch2 Authors
++// Distributed under the Boost Software License, Version 1.0.
++//   (See accompanying file LICENSE.txt or copy at
++//        https://www.boost.org/LICENSE_1_0.txt)
++
++// SPDX-License-Identifier: BSL-1.0
++
++#include <catch2/internal/catch_wildcard_matcher.hpp>
++
++#ifdef CATCH_CONFIG_WILDCARD_MATCHER
++
++namespace Catch {
++    namespace Detail {
++
++        bool WildcardMatcher::matches( std::string_view input ) const noexcept {
++            const char* s = input.data();
++            const char* s_end = s + input.size();
++            const char* p = m_pattern;
++            const char* star = nullptr;
++            const char* ss = s;
++
++            while ( s < s_end ) {
++                if ( ( *p == '?' ) || ( *p == *s ) ) {
++                    ++s;
++                    ++p;
++                    continue;
++                }
++
++                if ( *p == '*' ) {
++                    star = p++;
++                    ss = s;
++                    continue;
++                }
++
++                if ( star ) {
++                    p = star + 1;
++                    s = ++ss;
++                    continue;
++                }
++
++                return false;
++            }
++
++            while ( *p == '*' ) {
++                ++p;
++            }
++
++            return *p == '\0';
++        }
++
++    } // namespace Detail
++} // namespace Catch
++
++#endif // CATCH_CONFIG_WILDCARD_MATCHER
+diff --git a/src/catch2/internal/catch_wildcard_matcher.hpp b/src/catch2/internal/catch_wildcard_matcher.hpp
+new file mode 100644
+index 00000000..d54accd9
+--- /dev/null
++++ b/src/catch2/internal/catch_wildcard_matcher.hpp
+@@ -0,0 +1,46 @@
++//              Copyright Catch2 Authors
++// Distributed under the Boost Software License, Version 1.0.
++//   (See accompanying file LICENSE.txt or copy at
++//        https://www.boost.org/LICENSE_1_0.txt)
++
++// SPDX-License-Identifier: BSL-1.0
++#ifndef CATCH_WILDCARD_MATCHER_HPP_INCLUDED
++#define CATCH_WILDCARD_MATCHER_HPP_INCLUDED
++
++#ifdef CATCH_CONFIG_WILDCARD_MATCHER
++
++#include <string_view>
++
++namespace Catch {
++    namespace Detail {
++
++        class WildcardMatcher {
++            static constexpr size_t MaxPatternLength = 1024;
++
++        public:
++            template <size_t N>
++            explicit constexpr WildcardMatcher( const char (&pattern)[N] ) noexcept;
++
++            bool matches( std::string_view input ) const noexcept;
++
++        private:
++            char m_pattern[MaxPatternLength + 1] = {};
++            size_t m_length = 0;
++        };
++
++        template <size_t N>
++        constexpr WildcardMatcher::WildcardMatcher( const char (&pattern)[N] ) noexcept {
++            static_assert( N <= MaxPatternLength + 1,
++                           "WildcardMatcher: pattern length exceeds maximum of 1024 characters" );
++            for ( size_t i = 0; i < N; ++i ) {
++                m_pattern[i] = pattern[i];
++            }
++            m_length = N - 1;
++        }
++
++    } // namespace Detail
++} // namespace Catch
++
++#endif // CATCH_CONFIG_WILDCARD_MATCHER
++
++#endif // CATCH_WILDCARD_MATCHER_HPP_INCLUDED

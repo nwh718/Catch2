@@ -24,6 +24,15 @@ class RangeGenerator final : public IGenerator<T> {
     T m_step;
     bool m_positive;
 
+    void skipToNthElementImpl( std::size_t n ) override {
+        m_current += static_cast<T>(n) * m_step;
+        bool isValid = (m_positive) ? (m_current < m_end) : (m_current > m_end);
+        if ( !isValid ) {
+            Detail::throw_generator_exception(
+                "Coud not jump to Nth element: not enough elements" );
+        }
+    }
+
 public:
     RangeGenerator(T const& start, T const& end, T const& step):
         m_current(start),
@@ -73,6 +82,15 @@ class IteratorGenerator final : public IGenerator<T> {
 
     std::vector<T> m_elems;
     size_t m_current = 0;
+
+    void skipToNthElementImpl( std::size_t n ) override {
+        if ( n >= m_elems.size() ) {
+            Detail::throw_generator_exception(
+                "Coud not jump to Nth element: not enough elements" );
+        }
+        m_current = n;
+    }
+
 public:
     template <typename InputIterator, typename InputSentinel>
     IteratorGenerator(InputIterator first, InputSentinel last):m_elems(first, last) {

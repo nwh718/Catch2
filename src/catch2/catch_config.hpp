@@ -147,6 +147,9 @@ namespace Catch {
         unsigned int benchmarkResamples() const override;
         std::chrono::milliseconds benchmarkWarmupTime() const override;
 
+        // 统一过滤接口 - 用于检查路径是否匹配当前过滤器
+        bool matchesPathFilter(StringRef path) const;
+
     private:
         // Reads Bazel env vars and applies them to the config
         void readBazelEnvVars();

@@ -99,6 +99,10 @@ namespace Catch {
         virtual double benchmarkConfidenceInterval() const = 0;
         virtual unsigned int benchmarkResamples() const = 0;
         virtual std::chrono::milliseconds benchmarkWarmupTime() const = 0;
+
+        // 统一过滤接口 - 用于检查路径是否匹配当前过滤器
+        // 默认实现返回 true（始终匹配）
+        virtual bool matchesPathFilter(StringRef path) const;
     };
 }
 

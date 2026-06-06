@@ -121,6 +121,28 @@ namespace Generators {
         size_t m_target_repeats;
         size_t m_current_repeat = 0;
         size_t m_repeat_index = 0;
+
+        void skipToNthElementImpl( std::size_t n ) override {
+            // First make sure we have all elements cached
+            while (m_current_repeat == 0) {
+                m_returned.push_back(m_generator.get());
+                if (!m_generator.next()) {
+                    ++m_current_repeat;
+                } else if (m_returned.size() > n) {
+                    // Early exit if we already have enough elements cached
+                    break;
+                }
+            }
+            // Now compute the new position
+            size_t total_elements = m_returned.size() * m_target_repeats;
+            if (n >= total_elements) {
+                Detail::throw_generator_exception(
+                    "Coud not jump to Nth element: not enough elements" );
+            }
+            m_current_repeat = n / m_returned.size();
+            m_repeat_index = n % m_returned.size();
+        }
+
     public:
         RepeatGenerator(size_t repeats, GeneratorWrapper<T>&& generator):
             m_generator(CATCH_MOVE(generator)),

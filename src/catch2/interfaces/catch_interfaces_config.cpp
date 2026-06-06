@@ -7,7 +7,12 @@
 // SPDX-License-Identifier: BSL-1.0
 
 #include <catch2/interfaces/catch_interfaces_config.hpp>
+#include <catch2/internal/catch_stringref.hpp>
 
 namespace Catch {
     IConfig::~IConfig() = default;
+
+    bool IConfig::matchesPathFilter(StringRef) const {
+        return true;
+    }
 }
