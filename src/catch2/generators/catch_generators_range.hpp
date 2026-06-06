@@ -24,15 +24,6 @@ class RangeGenerator final : public IGenerator<T> {
     T m_step;
     bool m_positive;
 
-public:
-    RangeGenerator(T const& start, T const& end, T const& step):
-        m_current(start),
-        m_end(end),
-        m_step(step),
-        m_positive(m_step > T(0))
-    {
-        assert(m_current != m_end && "Range start and end cannot be equal");
-        assert(m_step != T(0) && "Step size cannot be zero");
         assert(((m_positive && m_current <= m_end) || (!m_positive && m_current >= m_end)) && "Step moves away from end");
     }
 
@@ -82,15 +73,6 @@ public:
     }
 
     T const& get() const override {
-        return m_elems[m_current];
-    }
-
-    bool next() override {
-        ++m_current;
-        return m_current != m_elems.size();
-    }
-
-    bool isFinite() const override { return true; }
 };
 
 template <typename InputIterator,

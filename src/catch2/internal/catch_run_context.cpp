@@ -7,6 +7,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #include <catch2/internal/catch_run_context.hpp>
 
+#include <catch2/catch_config.hpp>
 #include <catch2/catch_user_config.hpp>
 #include <catch2/generators/catch_generators_throw.hpp>
 #include <catch2/interfaces/catch_interfaces_config.hpp>
@@ -52,35 +53,34 @@ namespace Catch {
                     assert( m_generator &&
                             "Cannot create tracker without generator" );
 
-                    // Handle potential filter and move forward here...
-                    // Old style filters do not affect generators at all
-                    if (m_newStyleFilters && m_allTrackerDepth < m_filterRef->size()) {
-                        auto const& filter =
-                            ( *m_filterRef )[m_allTrackerDepth];
-                        // Generator cannot be un-entered the way a section
-                        // can be, so the tracker has to throw for a wrong
-                        // filter to stop the execution flow.
-                        if (filter.type == PathFilter::For::Section) {
-                            // We want the semantics of `SKIP()`, but we inline it
-                            // to avoid issues with conditionally prefixed macros
-                            INTERNAL_CATCH_MSG(
-                                "SKIP",
-                                Catch::ResultWas::ExplicitSkip,
-                                Catch::ResultDisposition::Normal,
-                                "" );
-                            Catch::Detail::Unreachable();
-                        }
-                        // '*' is the wildcard for "all elements in generator"
-                        // used for filtering sections below the generator, but
-                        // not the generator itself.
-                        if ( filter.filter != "*" ) {
-                            m_isFiltered = true;
-                            // TBD: We assume that the filter was validated as
-                            //      number during parsing. We should pass it
-                            //      as number from the CLI parser.
-                            size_t targetIndex = std::stoul( filter.filter );
-                            m_generator->skipToNthElement( targetIndex );
-                        }
+                    auto const activeFilter = resolveActivePathFilter(
+                        *m_filterRef,
+                        m_newStyleFilters,
+                        m_allTrackerDepth,
+                        m_sectionOnlyDepth,
+                        PathFilter::For::Generator );
+
+                    // Generator cannot be un-entered the way a section can be,
+                    // so the tracker has to throw for a wrong filter to stop
+                    // the execution flow.
+                    if ( activeFilter.kind ==
+                         ResolvedPathFilter::Kind::TrackerMismatch ) {
+                        INTERNAL_CATCH_MSG(
+                            "SKIP",
+                            Catch::ResultWas::ExplicitSkip,
+                            Catch::ResultDisposition::Normal,
+                            "" );
+                        Catch::Detail::Unreachable();
+                    }
+
+                    // '*' is the wildcard for "all elements in generator"
+                    // used for filtering sections below the generator, but
+                    // not the generator itself.
+                    if ( activeFilter.kind ==
+                         ResolvedPathFilter::Kind::GeneratorIndex ) {
+                        m_isFiltered = true;
+                        m_generator->skipToNthElement(
+                            activeFilter.generatorIndex );
                     }
                 }
 
@@ -156,22 +156,28 @@ namespace Catch {
                         // wait for them
 
                         // No filters left -> no restrictions on running sections
-                        size_t childDepth = 1 + (m_newStyleFilters ? m_allTrackerDepth : m_sectionOnlyDepth);
-                        if ( childDepth >= m_filterRef->size() ) {
+                        size_t childDepth =
+                            1 +
+                            ( m_newStyleFilters ? m_allTrackerDepth
+                                                 : m_sectionOnlyDepth );
+                        auto const* childFilter =
+                            pathFilterAtDepth( *m_filterRef, childDepth );
+                        if ( !childFilter ) {
                             return true;
                         }
 
                         // If we are using the new style filters, we need to check
                         // whether the successive filter is for section or a generator.
                         if ( m_newStyleFilters
-                            && (*m_filterRef)[childDepth].type != PathFilter::For::Section ) {
+                             && childFilter->type != PathFilter::For::Section ) {
                             return false;
                         }
                         // Look for any child section that could match the remaining filters
                         for ( auto const& child : m_children ) {
                             if ( child->isSectionTracker() &&
                                  static_cast<SectionTracker const&>( *child )
-                                         .trimmedName() == StringRef((*m_filterRef)[childDepth].filter) ) {
+                                         .trimmedName() ==
+                                     StringRef( childFilter->filter ) ) {
                                 return true;
                             }
                         }

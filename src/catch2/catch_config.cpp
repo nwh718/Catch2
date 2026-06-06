@@ -96,6 +96,61 @@ namespace Catch {
         return lhs.type == rhs.type && lhs.filter == rhs.filter;
     }
 
+    PathFilter const* pathFilterAtDepth(
+        std::vector<PathFilter> const& pathFilters,
+        std::size_t depth ) {
+        if ( depth >= pathFilters.size() ) {
+            return nullptr;
+        }
+
+        return &pathFilters[depth];
+    }
+
+    ResolvedPathFilter resolveActivePathFilter(
+        std::vector<PathFilter> const& pathFilters,
+        bool useNewFilterBehaviour,
+        std::size_t allTrackerDepth,
+        std::size_t sectionOnlyDepth,
+        PathFilter::For trackerType ) {
+        if ( !useNewFilterBehaviour && trackerType == PathFilter::For::Generator ) {
+            return {};
+        }
+
+        auto const filterDepth =
+            useNewFilterBehaviour ? allTrackerDepth : sectionOnlyDepth;
+        auto const* filter = pathFilterAtDepth( pathFilters, filterDepth );
+        if ( !filter ) {
+            return {};
+        }
+
+        if ( useNewFilterBehaviour && filter->type != trackerType ) {
+            return { ResolvedPathFilter::Kind::TrackerMismatch,
+                     StringRef( filter->filter ),
+                     0 };
+        }
+
+        if ( filter->type == PathFilter::For::Section ) {
+            return { ResolvedPathFilter::Kind::Section,
+                     StringRef( filter->filter ),
+                     0 };
+        }
+
+        if ( filter->filter == "*" ) {
+            return { ResolvedPathFilter::Kind::GeneratorWildcard,
+                     StringRef( filter->filter ),
+                     0 };
+        }
+
+        auto parsedIndex = parseUInt( filter->filter );
+        CATCH_ENFORCE(
+            parsedIndex,
+            "Invariant violation: generator path filters should contain "
+            "validated unsigned indices" );
+        return { ResolvedPathFilter::Kind::GeneratorIndex,
+                 StringRef( filter->filter ),
+                 *parsedIndex };
+    }
+
     Config::Config( ConfigData const& data ):
         m_data( data ) {
         // We need to trim filter specs to avoid trouble with superfluous
@@ -222,50 +277,6 @@ namespace Catch {
     unsigned int Config::benchmarkResamples() const               { return m_data.benchmarkResamples; }
     std::chrono::milliseconds Config::benchmarkWarmupTime() const { return std::chrono::milliseconds(m_data.benchmarkWarmupTime); }
 
-    void Config::readBazelEnvVars() {
-        // Register a JUnit reporter for Bazel. Bazel sets an environment
-        // variable with the path to XML output. If this file is written to
-        // during test, Bazel will not generate a default XML output.
-        // This allows the XML output file to contain higher level of detail
-        // than what is possible otherwise.
-        const auto bazelOutputFile = Detail::getEnv( "XML_OUTPUT_FILE" );
-
-        if ( bazelOutputFile ) {
-            m_data.reporterSpecifications.push_back(
-                { "junit", std::string( bazelOutputFile ), {}, {} } );
-        }
-
-        const auto bazelTestSpec = Detail::getEnv( "TESTBRIDGE_TEST_ONLY" );
-        if ( bazelTestSpec ) {
-            // Presumably the test spec from environment should overwrite
-            // the one we got from CLI (if we got any)
-            m_data.testsOrTags.clear();
-            m_data.testsOrTags.push_back( bazelTestSpec );
-        }
-
-        const auto bazelShardOptions = readBazelShardingOptions();
-        if ( bazelShardOptions ) {
-            std::ofstream f( bazelShardOptions->shardFilePath,
-                             std::ios_base::out | std::ios_base::trunc );
-            if ( f.is_open() ) {
-                f << "";
-                m_data.shardIndex = bazelShardOptions->shardIndex;
-                m_data.shardCount = bazelShardOptions->shardCount;
-            }
-        }
-
-        const auto bazelExitGuardFile = Detail::getEnv( "TEST_PREMATURE_EXIT_FILE" );
-        if (bazelExitGuardFile) {
-            m_data.prematureExitGuardFilePath = bazelExitGuardFile;
-        }
-
-        const auto bazelRandomSeed = Detail::getEnv( "TEST_RANDOM_SEED" );
-        if ( bazelRandomSeed ) {
-            auto parsedSeed = parseUInt( bazelRandomSeed, 0 );
-            if ( !parsedSeed ) {
-                // Currently we handle issues with parsing other Bazel Env
-                // options by warning and ignoring the issue. So we do the
-                // same for random seed option.
                 Catch::cerr()
                     << "Warning: could not parse 'TEST_RANDOM_SEED' ('"
                     << bazelRandomSeed << "') as proper seed.\n";

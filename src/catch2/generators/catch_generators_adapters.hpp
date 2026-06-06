@@ -121,28 +121,6 @@ namespace Generators {
         size_t m_target_repeats;
         size_t m_current_repeat = 0;
         size_t m_repeat_index = 0;
-    public:
-        RepeatGenerator(size_t repeats, GeneratorWrapper<T>&& generator):
-            m_generator(CATCH_MOVE(generator)),
-            m_target_repeats(repeats)
-        {
-            assert(m_target_repeats > 0 && "Repeat generator must repeat at least once");
-            if (!m_generator.isFinite()) {
-                Detail::throw_generator_exception( "Cannot repeat infinite generator" );
-            }
-        }
-
-        T const& get() const override {
-            if (m_current_repeat == 0) {
-                m_returned.push_back(m_generator.get());
-                return m_returned.back();
-            }
-            return m_returned[m_repeat_index];
-        }
-
-        bool next() override {
-            // There are 2 basic cases:
-            // 1) We are still reading the generator
             // 2) We are reading our own cache
 
             // In the first case, we need to poke the underlying generator.

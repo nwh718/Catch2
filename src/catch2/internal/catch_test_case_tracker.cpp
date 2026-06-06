@@ -7,6 +7,7 @@
 // SPDX-License-Identifier: BSL-1.0
 #include <catch2/internal/catch_test_case_tracker.hpp>
 
+#include <catch2/catch_config.hpp>
 #include <catch2/internal/catch_enforce.hpp>
 #include <catch2/internal/catch_move_and_forward.hpp>
 #include <catch2/internal/catch_path_filter.hpp>
@@ -177,22 +178,21 @@ namespace TestCaseTracking {
     }
 
     bool SectionTracker::isComplete() const {
+        auto const activeFilter = resolveActivePathFilter(
+            *m_filterRef,
+            m_newStyleFilters,
+            m_allTrackerDepth,
+            m_sectionOnlyDepth,
+            PathFilter::For::Section );
+
         // If there are active filters AND we do not pass them,
         // the section is always "completed"
-        const size_t filterIndex =
-            m_newStyleFilters ? m_allTrackerDepth : m_sectionOnlyDepth;
-        if ( filterIndex < m_filterRef->size() ) {
-            // There is active filter, check it
-            // 1) New style filter must explicitly target section
-            if ( m_newStyleFilters && ( *m_filterRef )[filterIndex].type !=
-                                          PathFilter::For::Section ) {
-                return true;
-            }
-            // 2) Both style filters must match the trimmed name exactly
-            if ( m_trimmed_name !=
-                 StringRef( ( *m_filterRef )[filterIndex].filter ) ) {
-                return true;
-            }
+        if ( activeFilter.kind == ResolvedPathFilter::Kind::TrackerMismatch ) {
+            return true;
+        }
+        if ( activeFilter.kind == ResolvedPathFilter::Kind::Section &&
+             m_trimmed_name != activeFilter.filter ) {
+            return true;
         }
 
         // Otherwise we delegate to the generic processing

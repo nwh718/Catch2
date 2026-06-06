@@ -1,0 +1,532 @@
+++diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+++index 0ed64ebf..b4ebd604 100644
+++--- a/src/CMakeLists.txt
++++++ b/src/CMakeLists.txt
+++@@ -151,7 +151,6 @@ set(IMPL_HEADERS
+++   ${SOURCES_DIR}/internal/catch_unique_ptr.hpp
+++   ${SOURCES_DIR}/internal/catch_unreachable.hpp
+++   ${SOURCES_DIR}/internal/catch_void_type.hpp
+++-  ${SOURCES_DIR}/internal/catch_wildcard_pattern.hpp
+++   ${SOURCES_DIR}/internal/catch_windows_h_proxy.hpp
+++   ${SOURCES_DIR}/internal/catch_xmlwriter.hpp
+++ )
+++@@ -218,7 +217,6 @@ set(IMPL_SOURCES
+++   ${SOURCES_DIR}/internal/catch_test_spec_parser.cpp
+++   ${SOURCES_DIR}/internal/catch_textflow.cpp
+++   ${SOURCES_DIR}/internal/catch_uncaught_exceptions.cpp
+++-  ${SOURCES_DIR}/internal/catch_wildcard_pattern.cpp
+++   ${SOURCES_DIR}/internal/catch_xmlwriter.cpp
+++ )
+++ set(INTERNAL_FILES ${IMPL_SOURCES} ${IMPL_HEADERS})
+++diff --git a/src/catch2/internal/catch_wildcard_matcher.cpp b/src/catch2/internal/catch_wildcard_matcher.cpp
+++new file mode 100644
+++index 00000000..c878eabb
+++--- /dev/null
++++++ b/src/catch2/internal/catch_wildcard_matcher.cpp
+++@@ -0,0 +1,54 @@
++++//              Copyright Catch2 Authors
++++// Distributed under the Boost Software License, Version 1.0.
++++//   (See accompanying file LICENSE.txt or copy at
++++//        https://www.boost.org/LICENSE_1_0.txt)
++++
++++// SPDX-License-Identifier: BSL-1.0
++++
++++#include <catch2/internal/catch_wildcard_matcher.hpp>
++++
++++#ifdef CATCH_CONFIG_WILDCARD_MATCHER
++++
++++namespace Catch {
++++    namespace Detail {
++++
++++        bool WildcardMatcher::matches( std::string_view input ) const noexcept {
++++            const char* s = input.data();
++++            const char* s_end = s + input.size();
++++            const char* p = m_pattern;
++++            const char* star = nullptr;
++++            const char* ss = s;
++++
++++            while ( s < s_end ) {
++++                if ( ( *p == '?' ) || ( *p == *s ) ) {
++++                    ++s;
++++                    ++p;
++++                    continue;
++++                }
++++
++++                if ( *p == '*' ) {
++++                    star = p++;
++++                    ss = s;
++++                    continue;
++++                }
++++
++++                if ( star ) {
++++                    p = star + 1;
++++                    s = ++ss;
++++                    continue;
++++                }
++++
++++                return false;
++++            }
++++
++++            while ( *p == '*' ) {
++++                ++p;
++++            }
++++
++++            return *p == '\0';
++++        }
++++
++++    } // namespace Detail
++++} // namespace Catch
++++
++++#endif // CATCH_CONFIG_WILDCARD_MATCHER
+++\ No newline at end of file
+++diff --git a/src/catch2/internal/catch_wildcard_matcher.hpp b/src/catch2/internal/catch_wildcard_matcher.hpp
+++new file mode 100644
+++index 00000000..3c8f0222
+++--- /dev/null
++++++ b/src/catch2/internal/catch_wildcard_matcher.hpp
+++@@ -0,0 +1,46 @@
++++//              Copyright Catch2 Authors
++++// Distributed under the Boost Software License, Version 1.0.
++++//   (See accompanying file LICENSE.txt or copy at
++++//        https://www.boost.org/LICENSE_1_0.txt)
++++
++++// SPDX-License-Identifier: BSL-1.0
++++#ifndef CATCH_WILDCARD_MATCHER_HPP_INCLUDED
++++#define CATCH_WILDCARD_MATCHER_HPP_INCLUDED
++++
++++#ifdef CATCH_CONFIG_WILDCARD_MATCHER
++++
++++#include <string_view>
++++
++++namespace Catch {
++++    namespace Detail {
++++
++++        class WildcardMatcher {
++++            static constexpr size_t MaxPatternLength = 1024;
++++
++++        public:
++++            template <size_t N>
++++            explicit constexpr WildcardMatcher( const char (&pattern)[N] ) noexcept;
++++
++++            bool matches( std::string_view input ) const noexcept;
++++
++++        private:
++++            char m_pattern[MaxPatternLength + 1] = {};
++++            size_t m_length = 0;
++++        };
++++
++++        template <size_t N>
++++        constexpr WildcardMatcher::WildcardMatcher( const char (&pattern)[N] ) noexcept {
++++            static_assert( N <= MaxPatternLength + 1,
++++                           "WildcardMatcher: pattern length exceeds maximum of 1024 characters" );
++++            for ( size_t i = 0; i < N; ++i ) {
++++                m_pattern[i] = pattern[i];
++++            }
++++            m_length = N - 1;
++++        }
++++
++++    } // namespace Detail
++++} // namespace Catch
++++
++++#endif // CATCH_CONFIG_WILDCARD_MATCHER
++++
++++#endif // CATCH_WILDCARD_MATCHER_HPP_INCLUDED
+++\ No newline at end of file
++diff --git a/src/catch2/internal/catch_wildcard_matcher.cpp b/src/catch2/internal/catch_wildcard_matcher.cpp
++new file mode 100644
++index 00000000..21e895bb
++--- /dev/null
+++++ b/src/catch2/internal/catch_wildcard_matcher.cpp
++@@ -0,0 +1,54 @@
+++//              Copyright Catch2 Authors
+++// Distributed under the Boost Software License, Version 1.0.
+++//   (See accompanying file LICENSE.txt or copy at
+++//        https://www.boost.org/LICENSE_1_0.txt)
+++
+++// SPDX-License-Identifier: BSL-1.0
+++
+++#include <catch2/internal/catch_wildcard_matcher.hpp>
+++
+++#ifdef CATCH_CONFIG_WILDCARD_MATCHER
+++
+++namespace Catch {
+++    namespace Detail {
+++
+++        bool WildcardMatcher::matches( std::string_view input ) const noexcept {
+++            const char* s = input.data();
+++            const char* s_end = s + input.size();
+++            const char* p = m_pattern;
+++            const char* star = nullptr;
+++            const char* ss = s;
+++
+++            while ( s < s_end ) {
+++                if ( ( *p == '?' ) || ( *p == *s ) ) {
+++                    ++s;
+++                    ++p;
+++                    continue;
+++                }
+++
+++                if ( *p == '*' ) {
+++                    star = p++;
+++                    ss = s;
+++                    continue;
+++                }
+++
+++                if ( star ) {
+++                    p = star + 1;
+++                    s = ++ss;
+++                    continue;
+++                }
+++
+++                return false;
+++            }
+++
+++            while ( *p == '*' ) {
+++                ++p;
+++            }
+++
+++            return *p == '\0';
+++        }
+++
+++    } // namespace Detail
+++} // namespace Catch
+++
+++#endif // CATCH_CONFIG_WILDCARD_MATCHER
++diff --git a/src/catch2/internal/catch_wildcard_matcher.hpp b/src/catch2/internal/catch_wildcard_matcher.hpp
++new file mode 100644
++index 00000000..d54accd9
++--- /dev/null
+++++ b/src/catch2/internal/catch_wildcard_matcher.hpp
++@@ -0,0 +1,46 @@
+++//              Copyright Catch2 Authors
+++// Distributed under the Boost Software License, Version 1.0.
+++//   (See accompanying file LICENSE.txt or copy at
+++//        https://www.boost.org/LICENSE_1_0.txt)
+++
+++// SPDX-License-Identifier: BSL-1.0
+++#ifndef CATCH_WILDCARD_MATCHER_HPP_INCLUDED
+++#define CATCH_WILDCARD_MATCHER_HPP_INCLUDED
+++
+++#ifdef CATCH_CONFIG_WILDCARD_MATCHER
+++
+++#include <string_view>
+++
+++namespace Catch {
+++    namespace Detail {
+++
+++        class WildcardMatcher {
+++            static constexpr size_t MaxPatternLength = 1024;
+++
+++        public:
+++            template <size_t N>
+++            explicit constexpr WildcardMatcher( const char (&pattern)[N] ) noexcept;
+++
+++            bool matches( std::string_view input ) const noexcept;
+++
+++        private:
+++            char m_pattern[MaxPatternLength + 1] = {};
+++            size_t m_length = 0;
+++        };
+++
+++        template <size_t N>
+++        constexpr WildcardMatcher::WildcardMatcher( const char (&pattern)[N] ) noexcept {
+++            static_assert( N <= MaxPatternLength + 1,
+++                           "WildcardMatcher: pattern length exceeds maximum of 1024 characters" );
+++            for ( size_t i = 0; i < N; ++i ) {
+++                m_pattern[i] = pattern[i];
+++            }
+++            m_length = N - 1;
+++        }
+++
+++    } // namespace Detail
+++} // namespace Catch
+++
+++#endif // CATCH_CONFIG_WILDCARD_MATCHER
+++
+++#endif // CATCH_WILDCARD_MATCHER_HPP_INCLUDED
+diff --git a/src/catch2/catch_config.cpp b/src/catch2/catch_config.cpp
+index b4584f3c..fb36f85c 100644
+--- a/src/catch2/catch_config.cpp
++++ b/src/catch2/catch_config.cpp
+@@ -222,6 +222,50 @@ namespace Catch {
+     unsigned int Config::benchmarkResamples() const               { return m_data.benchmarkResamples; }
+     std::chrono::milliseconds Config::benchmarkWarmupTime() const { return std::chrono::milliseconds(m_data.benchmarkWarmupTime); }
+ 
++    bool Config::matchesPathFilter(StringRef path) const {
++        // 如果没有设置路径过滤器，或者不使用新的过滤行为，则始终匹配
++        if (m_data.pathFilters.empty() || !m_data.useNewPathFilteringBehaviour) {
++            return true;
++        }
++
++        // 解析传入的路径（格式类似 "c:section1/g:2/c:section2"）
++        std::vector<PathFilter> parsedPath;
++        size_t start = 0;
++        while (start < path.size()) {
++            size_t end = path.find('/', start);
++            if (end == StringRef::npos) {
++                end = path.size();
++            }
++            StringRef component = path.substr(start, end - start);
++            if (component.size() >= 3) {
++                // 检查前缀 "g:" 或 "c:"（手动实现，避免依赖缺失的 StringRef 重载）
++                if (component[0] == 'g' && component[1] == ':') {
++                    parsedPath.emplace_back(PathFilter::For::Generator,
++                                            static_cast<std::string>(component.substr(2)));
++                } else if (component[0] == 'c' && component[1] == ':') {
++                    parsedPath.emplace_back(PathFilter::For::Section,
++                                            static_cast<std::string>(component.substr(2)));
++                }
++            }
++            start = end + 1;
++        }
++
++        // 检查解析后的路径是否是配置的路径过滤器的前缀或完全匹配
++        if (parsedPath.size() > m_data.pathFilters.size()) {
++            return false;
++        }
++        for (size_t i = 0; i < parsedPath.size(); ++i) {
++            if (parsedPath[i].type != m_data.pathFilters[i].type) {
++                return false;
++            }
++            if (m_data.pathFilters[i].filter != "*" &&
++                parsedPath[i].filter != m_data.pathFilters[i].filter) {
++                return false;
++            }
++        }
++        return true;
++    }
++
+     void Config::readBazelEnvVars() {
+         // Register a JUnit reporter for Bazel. Bazel sets an environment
+         // variable with the path to XML output. If this file is written to
+@@ -246,7 +290,7 @@ namespace Catch {
+         const auto bazelShardOptions = readBazelShardingOptions();
+         if ( bazelShardOptions ) {
+             std::ofstream f( bazelShardOptions->shardFilePath,
+-                             std::ios_base::out | std::ios_base::trunc );
++                            std::ios_base::out | std::ios_base::trunc );
+             if ( f.is_open() ) {
+                 f << "";
+                 m_data.shardIndex = bazelShardOptions->shardIndex;
+diff --git a/src/catch2/catch_config.hpp b/src/catch2/catch_config.hpp
+index c3fea561..2bc880a9 100644
+--- a/src/catch2/catch_config.hpp
++++ b/src/catch2/catch_config.hpp
+@@ -147,6 +147,9 @@ namespace Catch {
+         unsigned int benchmarkResamples() const override;
+         std::chrono::milliseconds benchmarkWarmupTime() const override;
+ 
++        // 统一过滤接口 - 用于检查路径是否匹配当前过滤器
++        bool matchesPathFilter(StringRef path) const;
++
+     private:
+         // Reads Bazel env vars and applies them to the config
+         void readBazelEnvVars();
+diff --git a/src/catch2/generators/catch_generators_adapters.hpp b/src/catch2/generators/catch_generators_adapters.hpp
+index 7e21671a..a23989bd 100644
+--- a/src/catch2/generators/catch_generators_adapters.hpp
++++ b/src/catch2/generators/catch_generators_adapters.hpp
+@@ -121,6 +121,28 @@ namespace Generators {
+         size_t m_target_repeats;
+         size_t m_current_repeat = 0;
+         size_t m_repeat_index = 0;
++
++        void skipToNthElementImpl( std::size_t n ) override {
++            // First make sure we have all elements cached
++            while (m_current_repeat == 0) {
++                m_returned.push_back(m_generator.get());
++                if (!m_generator.next()) {
++                    ++m_current_repeat;
++                } else if (m_returned.size() > n) {
++                    // Early exit if we already have enough elements cached
++                    break;
++                }
++            }
++            // Now compute the new position
++            size_t total_elements = m_returned.size() * m_target_repeats;
++            if (n >= total_elements) {
++                Detail::throw_generator_exception(
++                    "Coud not jump to Nth element: not enough elements" );
++            }
++            m_current_repeat = n / m_returned.size();
++            m_repeat_index = n % m_returned.size();
++        }
++
+     public:
+         RepeatGenerator(size_t repeats, GeneratorWrapper<T>&& generator):
+             m_generator(CATCH_MOVE(generator)),
+diff --git a/src/catch2/generators/catch_generators_range.hpp b/src/catch2/generators/catch_generators_range.hpp
+index 62739b23..45e69451 100644
+--- a/src/catch2/generators/catch_generators_range.hpp
++++ b/src/catch2/generators/catch_generators_range.hpp
+@@ -24,6 +24,15 @@ class RangeGenerator final : public IGenerator<T> {
+     T m_step;
+     bool m_positive;
+ 
++    void skipToNthElementImpl( std::size_t n ) override {
++        m_current += static_cast<T>(n) * m_step;
++        bool isValid = (m_positive) ? (m_current < m_end) : (m_current > m_end);
++        if ( !isValid ) {
++            Detail::throw_generator_exception(
++                "Coud not jump to Nth element: not enough elements" );
++        }
++    }
++
+ public:
+     RangeGenerator(T const& start, T const& end, T const& step):
+         m_current(start),
+@@ -73,6 +82,15 @@ class IteratorGenerator final : public IGenerator<T> {
+ 
+     std::vector<T> m_elems;
+     size_t m_current = 0;
++
++    void skipToNthElementImpl( std::size_t n ) override {
++        if ( n >= m_elems.size() ) {
++            Detail::throw_generator_exception(
++                "Coud not jump to Nth element: not enough elements" );
++        }
++        m_current = n;
++    }
++
+ public:
+     template <typename InputIterator, typename InputSentinel>
+     IteratorGenerator(InputIterator first, InputSentinel last):m_elems(first, last) {
+diff --git a/src/catch2/interfaces/catch_interfaces_config.cpp b/src/catch2/interfaces/catch_interfaces_config.cpp
+index 655bc1b4..2c1ed677 100644
+--- a/src/catch2/interfaces/catch_interfaces_config.cpp
++++ b/src/catch2/interfaces/catch_interfaces_config.cpp
+@@ -7,7 +7,12 @@
+ // SPDX-License-Identifier: BSL-1.0
+ 
+ #include <catch2/interfaces/catch_interfaces_config.hpp>
++#include <catch2/internal/catch_stringref.hpp>
+ 
+ namespace Catch {
+     IConfig::~IConfig() = default;
++
++    bool IConfig::matchesPathFilter(StringRef) const {
++        return true;
++    }
+ }
+diff --git a/src/catch2/interfaces/catch_interfaces_config.hpp b/src/catch2/interfaces/catch_interfaces_config.hpp
+index f52315db..bd6b6af1 100644
+--- a/src/catch2/interfaces/catch_interfaces_config.hpp
++++ b/src/catch2/interfaces/catch_interfaces_config.hpp
+@@ -99,6 +99,10 @@ namespace Catch {
+         virtual double benchmarkConfidenceInterval() const = 0;
+         virtual unsigned int benchmarkResamples() const = 0;
+         virtual std::chrono::milliseconds benchmarkWarmupTime() const = 0;
++
++        // 统一过滤接口 - 用于检查路径是否匹配当前过滤器
++        // 默认实现返回 true（始终匹配）
++        virtual bool matchesPathFilter(StringRef path) const;
+     };
+ }
+ 
+diff --git a/tests/SelfTest/IntrospectiveTests/GeneratorsImpl.tests.cpp b/tests/SelfTest/IntrospectiveTests/GeneratorsImpl.tests.cpp
+index 2c87b0e5..37497178 100644
+--- a/tests/SelfTest/IntrospectiveTests/GeneratorsImpl.tests.cpp
++++ b/tests/SelfTest/IntrospectiveTests/GeneratorsImpl.tests.cpp
+@@ -820,6 +820,102 @@ namespace {
+     };
+ }
+ 
++TEST_CASE( "RangeGenerator can be skipped forward efficiently",
++           "[generators][range]" ) {
++    using namespace Catch::Generators;
++    RangeGenerator<int> range_gen(0, 1000, 1);
++    REQUIRE( range_gen.get() == 0 );
++
++    range_gen.skipToNthElement( 500 );
++    REQUIRE( range_gen.get() == 500 );
++
++    range_gen.skipToNthElement( 999 );
++    REQUIRE( range_gen.get() == 999 );
++
++    // 跳到超出范围
++    REQUIRE_THROWS( range_gen.skipToNthElement( 1000 ) );
++}
++
++TEST_CASE( "IteratorGenerator can be skipped forward efficiently",
++           "[generators][from-range]" ) {
++    using namespace Catch::Generators;
++    std::vector<int> vec(1000);
++    for (int i = 0; i < 1000; ++i) {
++        vec[i] = i;
++    }
++
++    IteratorGenerator<int> it_gen(vec.begin(), vec.end());
++    REQUIRE( it_gen.get() == 0 );
++
++    it_gen.skipToNthElement( 500 );
++    REQUIRE( it_gen.get() == 500 );
++
++    it_gen.skipToNthElement( 999 );
++    REQUIRE( it_gen.get() == 999 );
++
++    // 跳到超出范围
++    REQUIRE_THROWS( it_gen.skipToNthElement( 1000 ) );
++}
++
++TEST_CASE( "RepeatGenerator can be skipped forward efficiently",
++           "[generators][repeat]" ) {
++    using namespace Catch::Generators;
++
++    // 测试基本重复跳过
++    RepeatGenerator<int> repeat_gen(3, values({1, 2, 3}));
++    REQUIRE( repeat_gen.get() == 1 );
++
++    repeat_gen.skipToNthElement( 4 );
++    REQUIRE( repeat_gen.get() == 2 ); // 第 0:1,1:2,2:3,3:1,4:2
++
++    repeat_gen.skipToNthElement( 8 );
++    REQUIRE( repeat_gen.get() == 3 );
++
++    // 超出范围
++    REQUIRE_THROWS( repeat_gen.skipToNthElement( 9 ) );
++}
++
++TEST_CASE( "统一过滤接口 matchesPathFilter 测试", "[config][filter]" ) {
++    using namespace Catch;
++
++    // 配置数据并初始化 Config
++    ConfigData data;
++    data.useNewPathFilteringBehaviour = true;
++
++    // 添加过滤器
++    data.pathFilters.emplace_back(PathFilter::For::Section, "section1");
++    data.pathFilters.emplace_back(PathFilter::For::Generator, "2");
++    data.pathFilters.emplace_back(PathFilter::For::Section, "subsection");
++
++    Config config(data);
++
++    // 测试匹配的路径
++    REQUIRE(config.matchesPathFilter("c:section1"));
++    REQUIRE(config.matchesPathFilter("c:section1/g:2"));
++    REQUIRE(config.matchesPathFilter("c:section1/g:2/c:subsection"));
++
++    // 测试不匹配的路径
++    REQUIRE_FALSE(config.matchesPathFilter("c:othersection"));
++    REQUIRE_FALSE(config.matchesPathFilter("c:section1/g:3"));
++    REQUIRE_FALSE(config.matchesPathFilter("c:section1/g:2/c:othersubsection"));
++
++    // 测试通配符
++    ConfigData wildcardData;
++    wildcardData.useNewPathFilteringBehaviour = true;
++    wildcardData.pathFilters.emplace_back(PathFilter::For::Section, "section1");
++    wildcardData.pathFilters.emplace_back(PathFilter::For::Generator, "*");
++    wildcardData.pathFilters.emplace_back(PathFilter::For::Section, "subsection");
++
++    Config wildcardConfig(wildcardData);
++    REQUIRE(wildcardConfig.matchesPathFilter("c:section1/g:5"));
++    REQUIRE(wildcardConfig.matchesPathFilter("c:section1/g:5/c:subsection"));
++
++    // 测试无过滤器的情况
++    ConfigData emptyData;
++    Config emptyConfig(emptyData);
++    REQUIRE(emptyConfig.matchesPathFilter("any/path"));
++}
++
+ TEST_CASE( "MapGenerator can handle not default constructible types",
+            "[generators][map]" ) {
+     using namespace Catch::Generators;

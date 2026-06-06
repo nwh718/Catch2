@@ -18,6 +18,7 @@
 #include <catch2/internal/catch_reporter_spec_parser.hpp>
 
 #include <chrono>
+#include <cstddef>
 #include <map>
 #include <string>
 #include <vector>
@@ -43,6 +44,30 @@ namespace Catch {
             return !( lhs == rhs );
         }
     };
+
+    struct ResolvedPathFilter {
+        enum class Kind {
+            None,
+            TrackerMismatch,
+            Section,
+            GeneratorWildcard,
+            GeneratorIndex,
+        };
+
+        Kind kind = Kind::None;
+        StringRef filter;
+        std::size_t generatorIndex = 0;
+    };
+
+    PathFilter const* pathFilterAtDepth(
+        std::vector<PathFilter> const& pathFilters,
+        std::size_t depth );
+    ResolvedPathFilter resolveActivePathFilter(
+        std::vector<PathFilter> const& pathFilters,
+        bool useNewFilterBehaviour,
+        std::size_t allTrackerDepth,
+        std::size_t sectionOnlyDepth,
+        PathFilter::For trackerType );
 
     struct ConfigData {
 
@@ -147,9 +172,6 @@ namespace Catch {
         unsigned int benchmarkResamples() const override;
         std::chrono::milliseconds benchmarkWarmupTime() const override;
 
-    private:
-        // Reads Bazel env vars and applies them to the config
-        void readBazelEnvVars();
 
         ConfigData m_data;
         std::vector<ProcessedReporterSpec> m_processedReporterSpecs;

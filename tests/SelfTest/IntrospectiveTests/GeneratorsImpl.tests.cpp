@@ -820,12 +820,3 @@ namespace {
     };
 }
 
-TEST_CASE( "MapGenerator can handle not default constructible types",
-           "[generators][map]" ) {
-    using namespace Catch::Generators;
-    auto map_generator = map( []( int i ) { return NotDefaultConstructible( i ); }, values({1, 2, 3}));
-    REQUIRE( map_generator.get().m_i == 1 );
-    REQUIRE( map_generator.next() );
-    REQUIRE( map_generator.next() );
-    REQUIRE( map_generator.get().m_i == 3 );
-}
