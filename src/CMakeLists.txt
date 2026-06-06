@@ -151,7 +151,6 @@ set(IMPL_HEADERS
   ${SOURCES_DIR}/internal/catch_unique_ptr.hpp
   ${SOURCES_DIR}/internal/catch_unreachable.hpp
   ${SOURCES_DIR}/internal/catch_void_type.hpp
-  ${SOURCES_DIR}/internal/catch_wildcard_pattern.hpp
   ${SOURCES_DIR}/internal/catch_windows_h_proxy.hpp
   ${SOURCES_DIR}/internal/catch_xmlwriter.hpp
 )
@@ -218,7 +217,6 @@ set(IMPL_SOURCES
   ${SOURCES_DIR}/internal/catch_test_spec_parser.cpp
   ${SOURCES_DIR}/internal/catch_textflow.cpp
   ${SOURCES_DIR}/internal/catch_uncaught_exceptions.cpp
-  ${SOURCES_DIR}/internal/catch_wildcard_pattern.cpp
   ${SOURCES_DIR}/internal/catch_xmlwriter.cpp
 )
 set(INTERNAL_FILES ${IMPL_SOURCES} ${IMPL_HEADERS})
