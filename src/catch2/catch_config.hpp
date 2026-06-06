@@ -44,6 +44,31 @@ namespace Catch {
         }
     };
 
+    struct ResolvedPathFilter {
+        enum class Kind {
+            None,
+            TrackerMismatch,
+            Section,
+            GeneratorWildcard,
+            GeneratorIndex,
+        };
+
+        Kind kind = Kind::None;
+        StringRef filter;
+        std::size_t generatorIndex = 0;
+    };
+
+    PathFilter const* pathFilterAtDepth(
+        std::vector<PathFilter> const& pathFilters,
+        std::size_t depth );
+
+    ResolvedPathFilter resolveActivePathFilter(
+        std::vector<PathFilter> const& pathFilters,
+        bool useNewFilterBehaviour,
+        std::size_t allTrackerDepth,
+        std::size_t sectionOnlyDepth,
+        PathFilter::For trackerType );
+
     struct ConfigData {
 
         bool listTests = false;
@@ -122,10 +147,6 @@ namespace Catch {
         std::string const& getExitGuardFilePath() const;
 
         // IConfig interface
-        bool allowThrows() const override;
-        StringRef name() const override;
-        bool includeSuccessfulResults() const override;
-        bool warnAboutMissingAssertions() const override;
         bool warnAboutUnmatchedTestSpecs() const override;
         bool warnAboutInfiniteGenerators() const override;
         bool zeroTestsCountAsSuccess() const override;

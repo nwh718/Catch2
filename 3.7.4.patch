@@ -1,0 +1,1986 @@
++++++diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
++++++index 0ed64ebf..b4ebd604 100644
++++++--- a/src/CMakeLists.txt
+++++++++ b/src/CMakeLists.txt
++++++@@ -151,7 +151,6 @@ set(IMPL_HEADERS
++++++   ${SOURCES_DIR}/internal/catch_unique_ptr.hpp
++++++   ${SOURCES_DIR}/internal/catch_unreachable.hpp
++++++   ${SOURCES_DIR}/internal/catch_void_type.hpp
++++++-  ${SOURCES_DIR}/internal/catch_wildcard_pattern.hpp
++++++   ${SOURCES_DIR}/internal/catch_windows_h_proxy.hpp
++++++   ${SOURCES_DIR}/internal/catch_xmlwriter.hpp
++++++ )
++++++@@ -218,7 +217,6 @@ set(IMPL_SOURCES
++++++   ${SOURCES_DIR}/internal/catch_test_spec_parser.cpp
++++++   ${SOURCES_DIR}/internal/catch_textflow.cpp
++++++   ${SOURCES_DIR}/internal/catch_uncaught_exceptions.cpp
++++++-  ${SOURCES_DIR}/internal/catch_wildcard_pattern.cpp
++++++   ${SOURCES_DIR}/internal/catch_xmlwriter.cpp
++++++ )
++++++ set(INTERNAL_FILES ${IMPL_SOURCES} ${IMPL_HEADERS})
++++++diff --git a/src/catch2/internal/catch_wildcard_matcher.cpp b/src/catch2/internal/catch_wildcard_matcher.cpp
++++++new file mode 100644
++++++index 00000000..c878eabb
++++++--- /dev/null
+++++++++ b/src/catch2/internal/catch_wildcard_matcher.cpp
++++++@@ -0,0 +1,54 @@
+++++++//              Copyright Catch2 Authors
+++++++// Distributed under the Boost Software License, Version 1.0.
+++++++//   (See accompanying file LICENSE.txt or copy at
+++++++//        https://www.boost.org/LICENSE_1_0.txt)
+++++++
+++++++// SPDX-License-Identifier: BSL-1.0
+++++++
+++++++#include <catch2/internal/catch_wildcard_matcher.hpp>
+++++++
+++++++#ifdef CATCH_CONFIG_WILDCARD_MATCHER
+++++++
+++++++namespace Catch {
+++++++    namespace Detail {
+++++++
+++++++        bool WildcardMatcher::matches( std::string_view input ) const noexcept {
+++++++            const char* s = input.data();
+++++++            const char* s_end = s + input.size();
+++++++            const char* p = m_pattern;
+++++++            const char* star = nullptr;
+++++++            const char* ss = s;
+++++++
+++++++            while ( s < s_end ) {
+++++++                if ( ( *p == '?' ) || ( *p == *s ) ) {
+++++++                    ++s;
+++++++                    ++p;
+++++++                    continue;
+++++++                }
+++++++
+++++++                if ( *p == '*' ) {
+++++++                    star = p++;
+++++++                    ss = s;
+++++++                    continue;
+++++++                }
+++++++
+++++++                if ( star ) {
+++++++                    p = star + 1;
+++++++                    s = ++ss;
+++++++                    continue;
+++++++                }
+++++++
+++++++                return false;
+++++++            }
+++++++
+++++++            while ( *p == '*' ) {
+++++++                ++p;
+++++++            }
+++++++
+++++++            return *p == '\0';
+++++++        }
+++++++
+++++++    } // namespace Detail
+++++++} // namespace Catch
+++++++
+++++++#endif // CATCH_CONFIG_WILDCARD_MATCHER
++++++\ No newline at end of file
++++++diff --git a/src/catch2/internal/catch_wildcard_matcher.hpp b/src/catch2/internal/catch_wildcard_matcher.hpp
++++++new file mode 100644
++++++index 00000000..3c8f0222
++++++--- /dev/null
+++++++++ b/src/catch2/internal/catch_wildcard_matcher.hpp
++++++@@ -0,0 +1,46 @@
+++++++//              Copyright Catch2 Authors
+++++++// Distributed under the Boost Software License, Version 1.0.
+++++++//   (See accompanying file LICENSE.txt or copy at
+++++++//        https://www.boost.org/LICENSE_1_0.txt)
+++++++
+++++++// SPDX-License-Identifier: BSL-1.0
+++++++#ifndef CATCH_WILDCARD_MATCHER_HPP_INCLUDED
+++++++#define CATCH_WILDCARD_MATCHER_HPP_INCLUDED
+++++++
+++++++#ifdef CATCH_CONFIG_WILDCARD_MATCHER
+++++++
+++++++#include <string_view>
+++++++
+++++++namespace Catch {
+++++++    namespace Detail {
+++++++
+++++++        class WildcardMatcher {
+++++++            static constexpr size_t MaxPatternLength = 1024;
+++++++
+++++++        public:
+++++++            template <size_t N>
+++++++            explicit constexpr WildcardMatcher( const char (&pattern)[N] ) noexcept;
+++++++
+++++++            bool matches( std::string_view input ) const noexcept;
+++++++
+++++++        private:
+++++++            char m_pattern[MaxPatternLength + 1] = {};
+++++++            size_t m_length = 0;
+++++++        };
+++++++
+++++++        template <size_t N>
+++++++        constexpr WildcardMatcher::WildcardMatcher( const char (&pattern)[N] ) noexcept {
+++++++            static_assert( N <= MaxPatternLength + 1,
+++++++                           "WildcardMatcher: pattern length exceeds maximum of 1024 characters" );
+++++++            for ( size_t i = 0; i < N; ++i ) {
+++++++                m_pattern[i] = pattern[i];
+++++++            }
+++++++            m_length = N - 1;
+++++++        }
+++++++
+++++++    } // namespace Detail
+++++++} // namespace Catch
+++++++
+++++++#endif // CATCH_CONFIG_WILDCARD_MATCHER
+++++++
+++++++#endif // CATCH_WILDCARD_MATCHER_HPP_INCLUDED
++++++\ No newline at end of file
+++++diff --git a/src/catch2/internal/catch_wildcard_matcher.cpp b/src/catch2/internal/catch_wildcard_matcher.cpp
+++++new file mode 100644
+++++index 00000000..21e895bb
+++++--- /dev/null
++++++++ b/src/catch2/internal/catch_wildcard_matcher.cpp
+++++@@ -0,0 +1,54 @@
++++++//              Copyright Catch2 Authors
++++++// Distributed under the Boost Software License, Version 1.0.
++++++//   (See accompanying file LICENSE.txt or copy at
++++++//        https://www.boost.org/LICENSE_1_0.txt)
++++++
++++++// SPDX-License-Identifier: BSL-1.0
++++++
++++++#include <catch2/internal/catch_wildcard_matcher.hpp>
++++++
++++++#ifdef CATCH_CONFIG_WILDCARD_MATCHER
++++++
++++++namespace Catch {
++++++    namespace Detail {
++++++
++++++        bool WildcardMatcher::matches( std::string_view input ) const noexcept {
++++++            const char* s = input.data();
++++++            const char* s_end = s + input.size();
++++++            const char* p = m_pattern;
++++++            const char* star = nullptr;
++++++            const char* ss = s;
++++++
++++++            while ( s < s_end ) {
++++++                if ( ( *p == '?' ) || ( *p == *s ) ) {
++++++                    ++s;
++++++                    ++p;
++++++                    continue;
++++++                }
++++++
++++++                if ( *p == '*' ) {
++++++                    star = p++;
++++++                    ss = s;
++++++                    continue;
++++++                }
++++++
++++++                if ( star ) {
++++++                    p = star + 1;
++++++                    s = ++ss;
++++++                    continue;
++++++                }
++++++
++++++                return false;
++++++            }
++++++
++++++            while ( *p == '*' ) {
++++++                ++p;
++++++            }
++++++
++++++            return *p == '\0';
++++++        }
++++++
++++++    } // namespace Detail
++++++} // namespace Catch
++++++
++++++#endif // CATCH_CONFIG_WILDCARD_MATCHER
+++++diff --git a/src/catch2/internal/catch_wildcard_matcher.hpp b/src/catch2/internal/catch_wildcard_matcher.hpp
+++++new file mode 100644
+++++index 00000000..d54accd9
+++++--- /dev/null
++++++++ b/src/catch2/internal/catch_wildcard_matcher.hpp
+++++@@ -0,0 +1,46 @@
++++++//              Copyright Catch2 Authors
++++++// Distributed under the Boost Software License, Version 1.0.
++++++//   (See accompanying file LICENSE.txt or copy at
++++++//        https://www.boost.org/LICENSE_1_0.txt)
++++++
++++++// SPDX-License-Identifier: BSL-1.0
++++++#ifndef CATCH_WILDCARD_MATCHER_HPP_INCLUDED
++++++#define CATCH_WILDCARD_MATCHER_HPP_INCLUDED
++++++
++++++#ifdef CATCH_CONFIG_WILDCARD_MATCHER
++++++
++++++#include <string_view>
++++++
++++++namespace Catch {
++++++    namespace Detail {
++++++
++++++        class WildcardMatcher {
++++++            static constexpr size_t MaxPatternLength = 1024;
++++++
++++++        public:
++++++            template <size_t N>
++++++            explicit constexpr WildcardMatcher( const char (&pattern)[N] ) noexcept;
++++++
++++++            bool matches( std::string_view input ) const noexcept;
++++++
++++++        private:
++++++            char m_pattern[MaxPatternLength + 1] = {};
++++++            size_t m_length = 0;
++++++        };
++++++
++++++        template <size_t N>
++++++        constexpr WildcardMatcher::WildcardMatcher( const char (&pattern)[N] ) noexcept {
++++++            static_assert( N <= MaxPatternLength + 1,
++++++                           "WildcardMatcher: pattern length exceeds maximum of 1024 characters" );
++++++            for ( size_t i = 0; i < N; ++i ) {
++++++                m_pattern[i] = pattern[i];
++++++            }
++++++            m_length = N - 1;
++++++        }
++++++
++++++    } // namespace Detail
++++++} // namespace Catch
++++++
++++++#endif // CATCH_CONFIG_WILDCARD_MATCHER
++++++
++++++#endif // CATCH_WILDCARD_MATCHER_HPP_INCLUDED
++++diff --git a/src/catch2/catch_config.cpp b/src/catch2/catch_config.cpp
++++index b4584f3c..fb36f85c 100644
++++--- a/src/catch2/catch_config.cpp
+++++++ b/src/catch2/catch_config.cpp
++++@@ -222,6 +222,50 @@ namespace Catch {
++++     unsigned int Config::benchmarkResamples() const               { return m_data.benchmarkResamples; }
++++     std::chrono::milliseconds Config::benchmarkWarmupTime() const { return std::chrono::milliseconds(m_data.benchmarkWarmupTime); }
++++ 
+++++    bool Config::matchesPathFilter(StringRef path) const {
+++++        // 如果没有设置路径过滤器，或者不使用新的过滤行为，则始终匹配
+++++        if (m_data.pathFilters.empty() || !m_data.useNewPathFilteringBehaviour) {
+++++            return true;
+++++        }
+++++
+++++        // 解析传入的路径（格式类似 "c:section1/g:2/c:section2"）
+++++        std::vector<PathFilter> parsedPath;
+++++        size_t start = 0;
+++++        while (start < path.size()) {
+++++            size_t end = path.find('/', start);
+++++            if (end == StringRef::npos) {
+++++                end = path.size();
+++++            }
+++++            StringRef component = path.substr(start, end - start);
+++++            if (component.size() >= 3) {
+++++                // 检查前缀 "g:" 或 "c:"（手动实现，避免依赖缺失的 StringRef 重载）
+++++                if (component[0] == 'g' && component[1] == ':') {
+++++                    parsedPath.emplace_back(PathFilter::For::Generator,
+++++                                            static_cast<std::string>(component.substr(2)));
+++++                } else if (component[0] == 'c' && component[1] == ':') {
+++++                    parsedPath.emplace_back(PathFilter::For::Section,
+++++                                            static_cast<std::string>(component.substr(2)));
+++++                }
+++++            }
+++++            start = end + 1;
+++++        }
+++++
+++++        // 检查解析后的路径是否是配置的路径过滤器的前缀或完全匹配
+++++        if (parsedPath.size() > m_data.pathFilters.size()) {
+++++            return false;
+++++        }
+++++        for (size_t i = 0; i < parsedPath.size(); ++i) {
+++++            if (parsedPath[i].type != m_data.pathFilters[i].type) {
+++++                return false;
+++++            }
+++++            if (m_data.pathFilters[i].filter != "*" &&
+++++                parsedPath[i].filter != m_data.pathFilters[i].filter) {
+++++                return false;
+++++            }
+++++        }
+++++        return true;
+++++    }
+++++
++++     void Config::readBazelEnvVars() {
++++         // Register a JUnit reporter for Bazel. Bazel sets an environment
++++         // variable with the path to XML output. If this file is written to
++++@@ -246,7 +290,7 @@ namespace Catch {
++++         const auto bazelShardOptions = readBazelShardingOptions();
++++         if ( bazelShardOptions ) {
++++             std::ofstream f( bazelShardOptions->shardFilePath,
++++-                             std::ios_base::out | std::ios_base::trunc );
+++++                            std::ios_base::out | std::ios_base::trunc );
++++             if ( f.is_open() ) {
++++                 f << "";
++++                 m_data.shardIndex = bazelShardOptions->shardIndex;
++++diff --git a/src/catch2/catch_config.hpp b/src/catch2/catch_config.hpp
++++index c3fea561..2bc880a9 100644
++++--- a/src/catch2/catch_config.hpp
+++++++ b/src/catch2/catch_config.hpp
++++@@ -147,6 +147,9 @@ namespace Catch {
++++         unsigned int benchmarkResamples() const override;
++++         std::chrono::milliseconds benchmarkWarmupTime() const override;
++++ 
+++++        // 统一过滤接口 - 用于检查路径是否匹配当前过滤器
+++++        bool matchesPathFilter(StringRef path) const;
+++++
++++     private:
++++         // Reads Bazel env vars and applies them to the config
++++         void readBazelEnvVars();
++++diff --git a/src/catch2/generators/catch_generators_adapters.hpp b/src/catch2/generators/catch_generators_adapters.hpp
++++index 7e21671a..a23989bd 100644
++++--- a/src/catch2/generators/catch_generators_adapters.hpp
+++++++ b/src/catch2/generators/catch_generators_adapters.hpp
++++@@ -121,6 +121,28 @@ namespace Generators {
++++         size_t m_target_repeats;
++++         size_t m_current_repeat = 0;
++++         size_t m_repeat_index = 0;
+++++
+++++        void skipToNthElementImpl( std::size_t n ) override {
+++++            // First make sure we have all elements cached
+++++            while (m_current_repeat == 0) {
+++++                m_returned.push_back(m_generator.get());
+++++                if (!m_generator.next()) {
+++++                    ++m_current_repeat;
+++++                } else if (m_returned.size() > n) {
+++++                    // Early exit if we already have enough elements cached
+++++                    break;
+++++                }
+++++            }
+++++            // Now compute the new position
+++++            size_t total_elements = m_returned.size() * m_target_repeats;
+++++            if (n >= total_elements) {
+++++                Detail::throw_generator_exception(
+++++                    "Coud not jump to Nth element: not enough elements" );
+++++            }
+++++            m_current_repeat = n / m_returned.size();
+++++            m_repeat_index = n % m_returned.size();
+++++        }
+++++
++++     public:
++++         RepeatGenerator(size_t repeats, GeneratorWrapper<T>&& generator):
++++             m_generator(CATCH_MOVE(generator)),
++++diff --git a/src/catch2/generators/catch_generators_range.hpp b/src/catch2/generators/catch_generators_range.hpp
++++index 62739b23..45e69451 100644
++++--- a/src/catch2/generators/catch_generators_range.hpp
+++++++ b/src/catch2/generators/catch_generators_range.hpp
++++@@ -24,6 +24,15 @@ class RangeGenerator final : public IGenerator<T> {
++++     T m_step;
++++     bool m_positive;
++++ 
+++++    void skipToNthElementImpl( std::size_t n ) override {
+++++        m_current += static_cast<T>(n) * m_step;
+++++        bool isValid = (m_positive) ? (m_current < m_end) : (m_current > m_end);
+++++        if ( !isValid ) {
+++++            Detail::throw_generator_exception(
+++++                "Coud not jump to Nth element: not enough elements" );
+++++        }
+++++    }
+++++
++++ public:
++++     RangeGenerator(T const& start, T const& end, T const& step):
++++         m_current(start),
++++@@ -73,6 +82,15 @@ class IteratorGenerator final : public IGenerator<T> {
++++ 
++++     std::vector<T> m_elems;
++++     size_t m_current = 0;
+++++
+++++    void skipToNthElementImpl( std::size_t n ) override {
+++++        if ( n >= m_elems.size() ) {
+++++            Detail::throw_generator_exception(
+++++                "Coud not jump to Nth element: not enough elements" );
+++++        }
+++++        m_current = n;
+++++    }
+++++
++++ public:
++++     template <typename InputIterator, typename InputSentinel>
++++     IteratorGenerator(InputIterator first, InputSentinel last):m_elems(first, last) {
++++diff --git a/src/catch2/interfaces/catch_interfaces_config.cpp b/src/catch2/interfaces/catch_interfaces_config.cpp
++++index 655bc1b4..2c1ed677 100644
++++--- a/src/catch2/interfaces/catch_interfaces_config.cpp
+++++++ b/src/catch2/interfaces/catch_interfaces_config.cpp
++++@@ -7,7 +7,12 @@
++++ // SPDX-License-Identifier: BSL-1.0
++++ 
++++ #include <catch2/interfaces/catch_interfaces_config.hpp>
+++++#include <catch2/internal/catch_stringref.hpp>
++++ 
++++ namespace Catch {
++++     IConfig::~IConfig() = default;
+++++
+++++    bool IConfig::matchesPathFilter(StringRef) const {
+++++        return true;
+++++    }
++++ }
++++diff --git a/src/catch2/interfaces/catch_interfaces_config.hpp b/src/catch2/interfaces/catch_interfaces_config.hpp
++++index f52315db..bd6b6af1 100644
++++--- a/src/catch2/interfaces/catch_interfaces_config.hpp
+++++++ b/src/catch2/interfaces/catch_interfaces_config.hpp
++++@@ -99,6 +99,10 @@ namespace Catch {
++++         virtual double benchmarkConfidenceInterval() const = 0;
++++         virtual unsigned int benchmarkResamples() const = 0;
++++         virtual std::chrono::milliseconds benchmarkWarmupTime() const = 0;
+++++
+++++        // 统一过滤接口 - 用于检查路径是否匹配当前过滤器
+++++        // 默认实现返回 true（始终匹配）
+++++        virtual bool matchesPathFilter(StringRef path) const;
++++     };
++++ }
++++ 
++++diff --git a/tests/SelfTest/IntrospectiveTests/GeneratorsImpl.tests.cpp b/tests/SelfTest/IntrospectiveTests/GeneratorsImpl.tests.cpp
++++index 2c87b0e5..37497178 100644
++++--- a/tests/SelfTest/IntrospectiveTests/GeneratorsImpl.tests.cpp
+++++++ b/tests/SelfTest/IntrospectiveTests/GeneratorsImpl.tests.cpp
++++@@ -820,6 +820,102 @@ namespace {
++++     };
++++ }
++++ 
+++++TEST_CASE( "RangeGenerator can be skipped forward efficiently",
+++++           "[generators][range]" ) {
+++++    using namespace Catch::Generators;
+++++    RangeGenerator<int> range_gen(0, 1000, 1);
+++++    REQUIRE( range_gen.get() == 0 );
+++++
+++++    range_gen.skipToNthElement( 500 );
+++++    REQUIRE( range_gen.get() == 500 );
+++++
+++++    range_gen.skipToNthElement( 999 );
+++++    REQUIRE( range_gen.get() == 999 );
+++++
+++++    // 跳到超出范围
+++++    REQUIRE_THROWS( range_gen.skipToNthElement( 1000 ) );
+++++}
+++++
+++++TEST_CASE( "IteratorGenerator can be skipped forward efficiently",
+++++           "[generators][from-range]" ) {
+++++    using namespace Catch::Generators;
+++++    std::vector<int> vec(1000);
+++++    for (int i = 0; i < 1000; ++i) {
+++++        vec[i] = i;
+++++    }
+++++
+++++    IteratorGenerator<int> it_gen(vec.begin(), vec.end());
+++++    REQUIRE( it_gen.get() == 0 );
+++++
+++++    it_gen.skipToNthElement( 500 );
+++++    REQUIRE( it_gen.get() == 500 );
+++++
+++++    it_gen.skipToNthElement( 999 );
+++++    REQUIRE( it_gen.get() == 999 );
+++++
+++++    // 跳到超出范围
+++++    REQUIRE_THROWS( it_gen.skipToNthElement( 1000 ) );
+++++}
+++++
+++++TEST_CASE( "RepeatGenerator can be skipped forward efficiently",
+++++           "[generators][repeat]" ) {
+++++    using namespace Catch::Generators;
+++++
+++++    // 测试基本重复跳过
+++++    RepeatGenerator<int> repeat_gen(3, values({1, 2, 3}));
+++++    REQUIRE( repeat_gen.get() == 1 );
+++++
+++++    repeat_gen.skipToNthElement( 4 );
+++++    REQUIRE( repeat_gen.get() == 2 ); // 第 0:1,1:2,2:3,3:1,4:2
+++++
+++++    repeat_gen.skipToNthElement( 8 );
+++++    REQUIRE( repeat_gen.get() == 3 );
+++++
+++++    // 超出范围
+++++    REQUIRE_THROWS( repeat_gen.skipToNthElement( 9 ) );
+++++}
+++++
+++++TEST_CASE( "统一过滤接口 matchesPathFilter 测试", "[config][filter]" ) {
+++++    using namespace Catch;
+++++
+++++    // 配置数据并初始化 Config
+++++    ConfigData data;
+++++    data.useNewPathFilteringBehaviour = true;
+++++
+++++    // 添加过滤器
+++++    data.pathFilters.emplace_back(PathFilter::For::Section, "section1");
+++++    data.pathFilters.emplace_back(PathFilter::For::Generator, "2");
+++++    data.pathFilters.emplace_back(PathFilter::For::Section, "subsection");
+++++
+++++    Config config(data);
+++++
+++++    // 测试匹配的路径
+++++    REQUIRE(config.matchesPathFilter("c:section1"));
+++++    REQUIRE(config.matchesPathFilter("c:section1/g:2"));
+++++    REQUIRE(config.matchesPathFilter("c:section1/g:2/c:subsection"));
+++++
+++++    // 测试不匹配的路径
+++++    REQUIRE_FALSE(config.matchesPathFilter("c:othersection"));
+++++    REQUIRE_FALSE(config.matchesPathFilter("c:section1/g:3"));
+++++    REQUIRE_FALSE(config.matchesPathFilter("c:section1/g:2/c:othersubsection"));
+++++
+++++    // 测试通配符
+++++    ConfigData wildcardData;
+++++    wildcardData.useNewPathFilteringBehaviour = true;
+++++    wildcardData.pathFilters.emplace_back(PathFilter::For::Section, "section1");
+++++    wildcardData.pathFilters.emplace_back(PathFilter::For::Generator, "*");
+++++    wildcardData.pathFilters.emplace_back(PathFilter::For::Section, "subsection");
+++++
+++++    Config wildcardConfig(wildcardData);
+++++    REQUIRE(wildcardConfig.matchesPathFilter("c:section1/g:5"));
+++++    REQUIRE(wildcardConfig.matchesPathFilter("c:section1/g:5/c:subsection"));
+++++
+++++    // 测试无过滤器的情况
+++++    ConfigData emptyData;
+++++    Config emptyConfig(emptyData);
+++++    REQUIRE(emptyConfig.matchesPathFilter("any/path"));
+++++}
+++++
++++ TEST_CASE( "MapGenerator can handle not default constructible types",
++++            "[generators][map]" ) {
++++     using namespace Catch::Generators;
+++diff --git a/src/catch2/catch_config.cpp b/src/catch2/catch_config.cpp
+++index b4584f3c..1867e09c 100644
+++--- a/src/catch2/catch_config.cpp
++++++ b/src/catch2/catch_config.cpp
+++@@ -96,6 +96,61 @@ namespace Catch {
+++         return lhs.type == rhs.type && lhs.filter == rhs.filter;
+++     }
+++ 
++++    PathFilter const* pathFilterAtDepth(
++++        std::vector<PathFilter> const& pathFilters,
++++        std::size_t depth ) {
++++        if ( depth >= pathFilters.size() ) {
++++            return nullptr;
++++        }
++++
++++        return &pathFilters[depth];
++++    }
++++
++++    ResolvedPathFilter resolveActivePathFilter(
++++        std::vector<PathFilter> const& pathFilters,
++++        bool useNewFilterBehaviour,
++++        std::size_t allTrackerDepth,
++++        std::size_t sectionOnlyDepth,
++++        PathFilter::For trackerType ) {
++++        if ( !useNewFilterBehaviour && trackerType == PathFilter::For::Generator ) {
++++            return {};
++++        }
++++
++++        auto const filterDepth =
++++            useNewFilterBehaviour ? allTrackerDepth : sectionOnlyDepth;
++++        auto const* filter = pathFilterAtDepth( pathFilters, filterDepth );
++++        if ( !filter ) {
++++            return {};
++++        }
++++
++++        if ( useNewFilterBehaviour && filter->type != trackerType ) {
++++            return { ResolvedPathFilter::Kind::TrackerMismatch,
++++                     StringRef( filter->filter ),
++++                     0 };
++++        }
++++
++++        if ( filter->type == PathFilter::For::Section ) {
++++            return { ResolvedPathFilter::Kind::Section,
++++                     StringRef( filter->filter ),
++++                     0 };
++++        }
++++
++++        if ( filter->filter == "*" ) {
++++            return { ResolvedPathFilter::Kind::GeneratorWildcard,
++++                     StringRef( filter->filter ),
++++                     0 };
++++        }
++++
++++        auto parsedIndex = parseUInt( filter->filter );
++++        CATCH_ENFORCE(
++++            parsedIndex,
++++            "Invariant violation: generator path filters should contain "
++++            "validated unsigned indices" );
++++        return { ResolvedPathFilter::Kind::GeneratorIndex,
++++                 StringRef( filter->filter ),
++++                 *parsedIndex };
++++    }
++++
+++     Config::Config( ConfigData const& data ):
+++         m_data( data ) {
+++         // We need to trim filter specs to avoid trouble with superfluous
+++@@ -222,50 +277,6 @@ namespace Catch {
+++     unsigned int Config::benchmarkResamples() const               { return m_data.benchmarkResamples; }
+++     std::chrono::milliseconds Config::benchmarkWarmupTime() const { return std::chrono::milliseconds(m_data.benchmarkWarmupTime); }
+++ 
+++-    void Config::readBazelEnvVars() {
+++-        // Register a JUnit reporter for Bazel. Bazel sets an environment
+++-        // variable with the path to XML output. If this file is written to
+++-        // during test, Bazel will not generate a default XML output.
+++-        // This allows the XML output file to contain higher level of detail
+++-        // than what is possible otherwise.
+++-        const auto bazelOutputFile = Detail::getEnv( "XML_OUTPUT_FILE" );
+++-
+++-        if ( bazelOutputFile ) {
+++-            m_data.reporterSpecifications.push_back(
+++-                { "junit", std::string( bazelOutputFile ), {}, {} } );
+++-        }
+++-
+++-        const auto bazelTestSpec = Detail::getEnv( "TESTBRIDGE_TEST_ONLY" );
+++-        if ( bazelTestSpec ) {
+++-            // Presumably the test spec from environment should overwrite
+++-            // the one we got from CLI (if we got any)
+++-            m_data.testsOrTags.clear();
+++-            m_data.testsOrTags.push_back( bazelTestSpec );
+++-        }
+++-
+++-        const auto bazelShardOptions = readBazelShardingOptions();
+++-        if ( bazelShardOptions ) {
+++-            std::ofstream f( bazelShardOptions->shardFilePath,
+++-                             std::ios_base::out | std::ios_base::trunc );
+++-            if ( f.is_open() ) {
+++-                f << "";
+++-                m_data.shardIndex = bazelShardOptions->shardIndex;
+++-                m_data.shardCount = bazelShardOptions->shardCount;
+++-            }
+++-        }
+++-
+++-        const auto bazelExitGuardFile = Detail::getEnv( "TEST_PREMATURE_EXIT_FILE" );
+++-        if (bazelExitGuardFile) {
+++-            m_data.prematureExitGuardFilePath = bazelExitGuardFile;
+++-        }
+++-
+++-        const auto bazelRandomSeed = Detail::getEnv( "TEST_RANDOM_SEED" );
+++-        if ( bazelRandomSeed ) {
+++-            auto parsedSeed = parseUInt( bazelRandomSeed, 0 );
+++-            if ( !parsedSeed ) {
+++-                // Currently we handle issues with parsing other Bazel Env
+++-                // options by warning and ignoring the issue. So we do the
+++-                // same for random seed option.
+++                 Catch::cerr()
+++                     << "Warning: could not parse 'TEST_RANDOM_SEED' ('"
+++                     << bazelRandomSeed << "') as proper seed.\n";
+++diff --git a/src/catch2/catch_config.hpp b/src/catch2/catch_config.hpp
+++index c3fea561..43f6e703 100644
+++--- a/src/catch2/catch_config.hpp
++++++ b/src/catch2/catch_config.hpp
+++@@ -18,6 +18,7 @@
+++ #include <catch2/internal/catch_reporter_spec_parser.hpp>
+++ 
+++ #include <chrono>
++++#include <cstddef>
+++ #include <map>
+++ #include <string>
+++ #include <vector>
+++@@ -44,6 +45,30 @@ namespace Catch {
+++         }
+++     };
+++ 
++++    struct ResolvedPathFilter {
++++        enum class Kind {
++++            None,
++++            TrackerMismatch,
++++            Section,
++++            GeneratorWildcard,
++++            GeneratorIndex,
++++        };
++++
++++        Kind kind = Kind::None;
++++        StringRef filter;
++++        std::size_t generatorIndex = 0;
++++    };
++++
++++    PathFilter const* pathFilterAtDepth(
++++        std::vector<PathFilter> const& pathFilters,
++++        std::size_t depth );
++++    ResolvedPathFilter resolveActivePathFilter(
++++        std::vector<PathFilter> const& pathFilters,
++++        bool useNewFilterBehaviour,
++++        std::size_t allTrackerDepth,
++++        std::size_t sectionOnlyDepth,
++++        PathFilter::For trackerType );
++++
+++     struct ConfigData {
+++ 
+++         bool listTests = false;
+++@@ -147,9 +172,6 @@ namespace Catch {
+++         unsigned int benchmarkResamples() const override;
+++         std::chrono::milliseconds benchmarkWarmupTime() const override;
+++ 
+++-    private:
+++-        // Reads Bazel env vars and applies them to the config
+++-        void readBazelEnvVars();
+++ 
+++         ConfigData m_data;
+++         std::vector<ProcessedReporterSpec> m_processedReporterSpecs;
+++diff --git a/src/catch2/generators/catch_generators_adapters.hpp b/src/catch2/generators/catch_generators_adapters.hpp
+++index 7e21671a..1ba58762 100644
+++--- a/src/catch2/generators/catch_generators_adapters.hpp
++++++ b/src/catch2/generators/catch_generators_adapters.hpp
+++@@ -121,28 +121,6 @@ namespace Generators {
+++         size_t m_target_repeats;
+++         size_t m_current_repeat = 0;
+++         size_t m_repeat_index = 0;
+++-    public:
+++-        RepeatGenerator(size_t repeats, GeneratorWrapper<T>&& generator):
+++-            m_generator(CATCH_MOVE(generator)),
+++-            m_target_repeats(repeats)
+++-        {
+++-            assert(m_target_repeats > 0 && "Repeat generator must repeat at least once");
+++-            if (!m_generator.isFinite()) {
+++-                Detail::throw_generator_exception( "Cannot repeat infinite generator" );
+++-            }
+++-        }
+++-
+++-        T const& get() const override {
+++-            if (m_current_repeat == 0) {
+++-                m_returned.push_back(m_generator.get());
+++-                return m_returned.back();
+++-            }
+++-            return m_returned[m_repeat_index];
+++-        }
+++-
+++-        bool next() override {
+++-            // There are 2 basic cases:
+++-            // 1) We are still reading the generator
+++             // 2) We are reading our own cache
+++ 
+++             // In the first case, we need to poke the underlying generator.
+++diff --git a/src/catch2/generators/catch_generators_range.hpp b/src/catch2/generators/catch_generators_range.hpp
+++index 62739b23..005fcd8a 100644
+++--- a/src/catch2/generators/catch_generators_range.hpp
++++++ b/src/catch2/generators/catch_generators_range.hpp
+++@@ -24,15 +24,6 @@ class RangeGenerator final : public IGenerator<T> {
+++     T m_step;
+++     bool m_positive;
+++ 
+++-public:
+++-    RangeGenerator(T const& start, T const& end, T const& step):
+++-        m_current(start),
+++-        m_end(end),
+++-        m_step(step),
+++-        m_positive(m_step > T(0))
+++-    {
+++-        assert(m_current != m_end && "Range start and end cannot be equal");
+++-        assert(m_step != T(0) && "Step size cannot be zero");
+++         assert(((m_positive && m_current <= m_end) || (!m_positive && m_current >= m_end)) && "Step moves away from end");
+++     }
+++ 
+++@@ -82,15 +73,6 @@ public:
+++     }
+++ 
+++     T const& get() const override {
+++-        return m_elems[m_current];
+++-    }
+++-
+++-    bool next() override {
+++-        ++m_current;
+++-        return m_current != m_elems.size();
+++-    }
+++-
+++-    bool isFinite() const override { return true; }
+++ };
+++ 
+++ template <typename InputIterator,
+++diff --git a/src/catch2/interfaces/catch_interfaces_config.cpp b/src/catch2/interfaces/catch_interfaces_config.cpp
+++index 655bc1b4..a9a0c1b1 100644
+++--- a/src/catch2/interfaces/catch_interfaces_config.cpp
++++++ b/src/catch2/interfaces/catch_interfaces_config.cpp
+++@@ -7,7 +7,6 @@
+++ // SPDX-License-Identifier: BSL-1.0
+++ 
+++ #include <catch2/interfaces/catch_interfaces_config.hpp>
+++-
+++ namespace Catch {
+++     IConfig::~IConfig() = default;
+++ }
+++diff --git a/src/catch2/interfaces/catch_interfaces_config.hpp b/src/catch2/interfaces/catch_interfaces_config.hpp
+++index f52315db..4bbce765 100644
+++--- a/src/catch2/interfaces/catch_interfaces_config.hpp
++++++ b/src/catch2/interfaces/catch_interfaces_config.hpp
+++@@ -99,7 +99,3 @@ namespace Catch {
+++         virtual double benchmarkConfidenceInterval() const = 0;
+++         virtual unsigned int benchmarkResamples() const = 0;
+++         virtual std::chrono::milliseconds benchmarkWarmupTime() const = 0;
+++-    };
+++-}
+++-
+++-#endif // CATCH_INTERFACES_CONFIG_HPP_INCLUDED
+++diff --git a/src/catch2/internal/catch_run_context.cpp b/src/catch2/internal/catch_run_context.cpp
+++index a435170f..ff69a169 100644
+++--- a/src/catch2/internal/catch_run_context.cpp
++++++ b/src/catch2/internal/catch_run_context.cpp
+++@@ -7,6 +7,7 @@
+++ // SPDX-License-Identifier: BSL-1.0
+++ #include <catch2/internal/catch_run_context.hpp>
+++ 
++++#include <catch2/catch_config.hpp>
+++ #include <catch2/catch_user_config.hpp>
+++ #include <catch2/generators/catch_generators_throw.hpp>
+++ #include <catch2/interfaces/catch_interfaces_config.hpp>
+++@@ -52,35 +53,34 @@ namespace Catch {
+++                     assert( m_generator &&
+++                             "Cannot create tracker without generator" );
+++ 
+++-                    // Handle potential filter and move forward here...
+++-                    // Old style filters do not affect generators at all
+++-                    if (m_newStyleFilters && m_allTrackerDepth < m_filterRef->size()) {
+++-                        auto const& filter =
+++-                            ( *m_filterRef )[m_allTrackerDepth];
+++-                        // Generator cannot be un-entered the way a section
+++-                        // can be, so the tracker has to throw for a wrong
+++-                        // filter to stop the execution flow.
+++-                        if (filter.type == PathFilter::For::Section) {
+++-                            // We want the semantics of `SKIP()`, but we inline it
+++-                            // to avoid issues with conditionally prefixed macros
+++-                            INTERNAL_CATCH_MSG(
+++-                                "SKIP",
+++-                                Catch::ResultWas::ExplicitSkip,
+++-                                Catch::ResultDisposition::Normal,
+++-                                "" );
+++-                            Catch::Detail::Unreachable();
+++-                        }
+++-                        // '*' is the wildcard for "all elements in generator"
+++-                        // used for filtering sections below the generator, but
+++-                        // not the generator itself.
+++-                        if ( filter.filter != "*" ) {
+++-                            m_isFiltered = true;
+++-                            // TBD: We assume that the filter was validated as
+++-                            //      number during parsing. We should pass it
+++-                            //      as number from the CLI parser.
+++-                            size_t targetIndex = std::stoul( filter.filter );
+++-                            m_generator->skipToNthElement( targetIndex );
+++-                        }
++++                    auto const activeFilter = resolveActivePathFilter(
++++                        *m_filterRef,
++++                        m_newStyleFilters,
++++                        m_allTrackerDepth,
++++                        m_sectionOnlyDepth,
++++                        PathFilter::For::Generator );
++++
++++                    // Generator cannot be un-entered the way a section can be,
++++                    // so the tracker has to throw for a wrong filter to stop
++++                    // the execution flow.
++++                    if ( activeFilter.kind ==
++++                         ResolvedPathFilter::Kind::TrackerMismatch ) {
++++                        INTERNAL_CATCH_MSG(
++++                            "SKIP",
++++                            Catch::ResultWas::ExplicitSkip,
++++                            Catch::ResultDisposition::Normal,
++++                            "" );
++++                        Catch::Detail::Unreachable();
++++                    }
++++
++++                    // '*' is the wildcard for "all elements in generator"
++++                    // used for filtering sections below the generator, but
++++                    // not the generator itself.
++++                    if ( activeFilter.kind ==
++++                         ResolvedPathFilter::Kind::GeneratorIndex ) {
++++                        m_isFiltered = true;
++++                        m_generator->skipToNthElement(
++++                            activeFilter.generatorIndex );
+++                     }
+++                 }
+++ 
+++@@ -156,22 +156,28 @@ namespace Catch {
+++                         // wait for them
+++ 
+++                         // No filters left -> no restrictions on running sections
+++-                        size_t childDepth = 1 + (m_newStyleFilters ? m_allTrackerDepth : m_sectionOnlyDepth);
+++-                        if ( childDepth >= m_filterRef->size() ) {
++++                        size_t childDepth =
++++                            1 +
++++                            ( m_newStyleFilters ? m_allTrackerDepth
++++                                                 : m_sectionOnlyDepth );
++++                        auto const* childFilter =
++++                            pathFilterAtDepth( *m_filterRef, childDepth );
++++                        if ( !childFilter ) {
+++                             return true;
+++                         }
+++ 
+++                         // If we are using the new style filters, we need to check
+++                         // whether the successive filter is for section or a generator.
+++                         if ( m_newStyleFilters
+++-                            && (*m_filterRef)[childDepth].type != PathFilter::For::Section ) {
++++                             && childFilter->type != PathFilter::For::Section ) {
+++                             return false;
+++                         }
+++                         // Look for any child section that could match the remaining filters
+++                         for ( auto const& child : m_children ) {
+++                             if ( child->isSectionTracker() &&
+++                                  static_cast<SectionTracker const&>( *child )
+++-                                         .trimmedName() == StringRef((*m_filterRef)[childDepth].filter) ) {
++++                                         .trimmedName() ==
++++                                     StringRef( childFilter->filter ) ) {
+++                                 return true;
+++                             }
+++                         }
+++diff --git a/src/catch2/internal/catch_test_case_tracker.cpp b/src/catch2/internal/catch_test_case_tracker.cpp
+++index 05bfff8e..5c2f9504 100644
+++--- a/src/catch2/internal/catch_test_case_tracker.cpp
++++++ b/src/catch2/internal/catch_test_case_tracker.cpp
+++@@ -7,6 +7,7 @@
+++ // SPDX-License-Identifier: BSL-1.0
+++ #include <catch2/internal/catch_test_case_tracker.hpp>
+++ 
++++#include <catch2/catch_config.hpp>
+++ #include <catch2/internal/catch_enforce.hpp>
+++ #include <catch2/internal/catch_move_and_forward.hpp>
+++ #include <catch2/internal/catch_path_filter.hpp>
+++@@ -177,22 +178,21 @@ namespace TestCaseTracking {
+++     }
+++ 
+++     bool SectionTracker::isComplete() const {
++++        auto const activeFilter = resolveActivePathFilter(
++++            *m_filterRef,
++++            m_newStyleFilters,
++++            m_allTrackerDepth,
++++            m_sectionOnlyDepth,
++++            PathFilter::For::Section );
++++
+++         // If there are active filters AND we do not pass them,
+++         // the section is always "completed"
+++-        const size_t filterIndex =
+++-            m_newStyleFilters ? m_allTrackerDepth : m_sectionOnlyDepth;
+++-        if ( filterIndex < m_filterRef->size() ) {
+++-            // There is active filter, check it
+++-            // 1) New style filter must explicitly target section
+++-            if ( m_newStyleFilters && ( *m_filterRef )[filterIndex].type !=
+++-                                          PathFilter::For::Section ) {
+++-                return true;
+++-            }
+++-            // 2) Both style filters must match the trimmed name exactly
+++-            if ( m_trimmed_name !=
+++-                 StringRef( ( *m_filterRef )[filterIndex].filter ) ) {
+++-                return true;
+++-            }
++++        if ( activeFilter.kind == ResolvedPathFilter::Kind::TrackerMismatch ) {
++++            return true;
++++        }
++++        if ( activeFilter.kind == ResolvedPathFilter::Kind::Section &&
++++             m_trimmed_name != activeFilter.filter ) {
++++            return true;
+++         }
+++ 
+++         // Otherwise we delegate to the generic processing
+++diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+++index 7429734f..b8bbb053 100644
+++--- a/tests/CMakeLists.txt
++++++ b/tests/CMakeLists.txt
+++@@ -83,6 +83,7 @@ set(TEST_SOURCES
+++   ${SELF_TEST_DIR}/IntrospectiveTests/Json.tests.cpp
+++   ${SELF_TEST_DIR}/IntrospectiveTests/Parse.tests.cpp
+++   ${SELF_TEST_DIR}/IntrospectiveTests/PartTracker.tests.cpp
++++  ${SELF_TEST_DIR}/IntrospectiveTests/PathFilteringPerformance.tests.cpp
+++   ${SELF_TEST_DIR}/IntrospectiveTests/RandomNumberGeneration.tests.cpp
+++   ${SELF_TEST_DIR}/IntrospectiveTests/Reporters.tests.cpp
+++   ${SELF_TEST_DIR}/IntrospectiveTests/Tag.tests.cpp
+++diff --git a/tests/SelfTest/IntrospectiveTests/GeneratorsImpl.tests.cpp b/tests/SelfTest/IntrospectiveTests/GeneratorsImpl.tests.cpp
+++index 2c87b0e5..c0abd864 100644
+++--- a/tests/SelfTest/IntrospectiveTests/GeneratorsImpl.tests.cpp
++++++ b/tests/SelfTest/IntrospectiveTests/GeneratorsImpl.tests.cpp
+++@@ -820,12 +820,3 @@ namespace {
+++     };
+++ }
+++ 
+++-TEST_CASE( "MapGenerator can handle not default constructible types",
+++-           "[generators][map]" ) {
+++-    using namespace Catch::Generators;
+++-    auto map_generator = map( []( int i ) { return NotDefaultConstructible( i ); }, values({1, 2, 3}));
+++-    REQUIRE( map_generator.get().m_i == 1 );
+++-    REQUIRE( map_generator.next() );
+++-    REQUIRE( map_generator.next() );
+++-    REQUIRE( map_generator.get().m_i == 3 );
+++-}
+++diff --git a/tests/SelfTest/IntrospectiveTests/PathFilteringPerformance.tests.cpp b/tests/SelfTest/IntrospectiveTests/PathFilteringPerformance.tests.cpp
+++new file mode 100644
+++index 00000000..2204b3cb
+++--- /dev/null
++++++ b/tests/SelfTest/IntrospectiveTests/PathFilteringPerformance.tests.cpp
+++@@ -0,0 +1,128 @@
++++#include <catch2/catch_config.hpp>
++++#include <catch2/catch_test_macros.hpp>
++++#include <catch2/generators/catch_generators.hpp>
++++#include <catch2/internal/catch_path_filter.hpp>
++++
++++#include <vector>
++++
++++namespace {
++++    struct CountingSkipGenerator final : Catch::Generators::IGenerator<int> {
++++        int m_current = 0;
++++        int* m_skipCalls;
++++        int* m_nextCalls;
++++
++++        CountingSkipGenerator( int& skipCalls, int& nextCalls ):
++++            m_skipCalls( &skipCalls ),
++++            m_nextCalls( &nextCalls ) {}
++++
++++        int const& get() const override { return m_current; }
++++
++++        bool next() override {
++++            ++*m_nextCalls;
++++            ++m_current;
++++            return true;
++++        }
++++
++++        void skipToNthElementImpl( std::size_t n ) override {
++++            ++*m_skipCalls;
++++            m_current = static_cast<int>( n );
++++        }
++++
++++        bool isFinite() const override { return true; }
++++    };
++++}
++++
++++TEST_CASE( "Resolved path filters unify section and generator lookup",
++++           "[config][path-filter]" ) {
++++    std::vector<Catch::PathFilter> filters = {
++++        { Catch::PathFilter::For::Section, "outer" },
++++        { Catch::PathFilter::For::Generator, "4" },
++++        { Catch::PathFilter::For::Section, "leaf" },
++++    };
++++
++++    auto const legacySection = Catch::resolveActivePathFilter(
++++        filters,
++++        false,
++++        99,
++++        0,
++++        Catch::PathFilter::For::Section );
++++    REQUIRE( legacySection.kind == Catch::ResolvedPathFilter::Kind::Section );
++++    REQUIRE( legacySection.filter == "outer" );
++++
++++    auto const legacyGenerator = Catch::resolveActivePathFilter(
++++        filters,
++++        false,
++++        1,
++++        1,
++++        Catch::PathFilter::For::Generator );
++++    REQUIRE( legacyGenerator.kind == Catch::ResolvedPathFilter::Kind::None );
++++
++++    auto const newGenerator = Catch::resolveActivePathFilter(
++++        filters,
++++        true,
++++        1,
++++        0,
++++        Catch::PathFilter::For::Generator );
++++    REQUIRE( newGenerator.kind ==
++++             Catch::ResolvedPathFilter::Kind::GeneratorIndex );
++++    REQUIRE( newGenerator.generatorIndex == 4 );
++++
++++    auto const mismatchedSection = Catch::resolveActivePathFilter(
++++        filters,
++++        true,
++++        1,
++++        0,
++++        Catch::PathFilter::For::Section );
++++    REQUIRE( mismatchedSection.kind ==
++++             Catch::ResolvedPathFilter::Kind::TrackerMismatch );
++++
++++    auto const* childFilter = Catch::pathFilterAtDepth( filters, 2 );
++++    REQUIRE( childFilter != nullptr );
++++    REQUIRE( childFilter->type == Catch::PathFilter::For::Section );
++++    REQUIRE( childFilter->filter == "leaf" );
++++
++++    std::vector<Catch::PathFilter> wildcardFilter = {
++++        { Catch::PathFilter::For::Generator, "*" },
++++    };
++++    auto const wildcard = Catch::resolveActivePathFilter(
++++        wildcardFilter,
++++        true,
++++        0,
++++        0,
++++        Catch::PathFilter::For::Generator );
++++    REQUIRE( wildcard.kind ==
++++             Catch::ResolvedPathFilter::Kind::GeneratorWildcard );
++++}
++++
++++TEST_CASE( "Generator path filtering keeps Take on the direct skip path",
++++           "[generators][take][path-filter][performance][regression]" ) {
++++    using namespace Catch::Generators;
++++
++++    int skipCalls = 0;
++++    int nextCalls = 0;
++++    std::vector<Catch::PathFilter> filters = {
++++        { Catch::PathFilter::For::Section, "outer" },
++++        { Catch::PathFilter::For::Generator, "9" },
++++        { Catch::PathFilter::For::Section, "leaf" },
++++    };
++++
++++    auto const activeFilter = Catch::resolveActivePathFilter(
++++        filters,
++++        true,
++++        1,
++++        0,
++++        Catch::PathFilter::For::Generator );
++++    REQUIRE( activeFilter.kind ==
++++             Catch::ResolvedPathFilter::Kind::GeneratorIndex );
++++
++++    auto generator = take(
++++        16,
++++        GeneratorWrapper<int>( new CountingSkipGenerator( skipCalls, nextCalls ) ) );
++++    REQUIRE( generator.get() == 0 );
++++
++++    generator.skipToNthElement( activeFilter.generatorIndex );
++++
++++    REQUIRE( generator.get() == 9 );
++++    REQUIRE( skipCalls == 1 );
++++    REQUIRE( nextCalls == 0 );
++++}
++diff --git a/src/catch2/catch_config.cpp b/src/catch2/catch_config.cpp
++index b4584f3c..7bd8a511 100644
++--- a/src/catch2/catch_config.cpp
+++++ b/src/catch2/catch_config.cpp
++@@ -96,61 +96,61 @@ namespace Catch {
++         return lhs.type == rhs.type && lhs.filter == rhs.filter;
++     }
++ 
++-    Config::Config( ConfigData const& data ):
++-        m_data( data ) {
++-        // We need to trim filter specs to avoid trouble with superfluous
++-        // whitespace (esp. important for bdd macros, as those are manually
++-        // aligned with whitespace).
++-
++-        for (auto& elem : m_data.testsOrTags) {
++-            elem = trim(elem);
+++    PathFilter const* pathFilterAtDepth(
+++        std::vector<PathFilter> const& pathFilters,
+++        std::size_t depth ) {
+++        if ( depth >= pathFilters.size() ) {
+++            return nullptr;
++         }
++ 
++-        // Insert the default reporter if user hasn't asked for a specific one
++-        if ( m_data.reporterSpecifications.empty() ) {
++-#if defined( CATCH_CONFIG_DEFAULT_REPORTER )
++-            const auto default_spec = CATCH_CONFIG_DEFAULT_REPORTER;
++-#else
++-            const auto default_spec = "console";
++-#endif
++-            auto parsed = parseReporterSpec(default_spec);
++-            CATCH_ENFORCE( parsed,
++-                           "Cannot parse the provided default reporter spec: '"
++-                               << default_spec << '\'' );
++-            m_data.reporterSpecifications.push_back( std::move( *parsed ) );
+++        return &pathFilters[depth];
+++    }
+++
+++    ResolvedPathFilter resolveActivePathFilter(
+++        std::vector<PathFilter> const& pathFilters,
+++        bool useNewFilterBehaviour,
+++        std::size_t allTrackerDepth,
+++        std::size_t sectionOnlyDepth,
+++        PathFilter::For trackerType ) {
+++        if ( !useNewFilterBehaviour && trackerType == PathFilter::For::Generator ) {
+++            return {};
++         }
++ 
++-        // Reading bazel env vars can change some parts of the config data,
++-        // so we have to process the bazel env before acting on the config.
++-        if ( enableBazelEnvSupport() ) {
++-            readBazelEnvVars();
+++        auto const filterDepth =
+++            useNewFilterBehaviour ? allTrackerDepth : sectionOnlyDepth;
+++        auto const* filter = pathFilterAtDepth( pathFilters, filterDepth );
+++        if ( !filter ) {
+++            return {};
++         }
++ 
++-        // Bazel support can modify the test specs, so parsing has to happen
++-        // after reading Bazel env vars.
++-        TestSpecParser parser( ITagAliasRegistry::get() );
++-        if ( !m_data.testsOrTags.empty() ) {
++-            m_hasTestFilters = true;
++-            for ( auto const& testOrTags : m_data.testsOrTags ) {
++-                parser.parse( testOrTags );
++-            }
+++        if ( useNewFilterBehaviour && filter->type != trackerType ) {
+++            return { ResolvedPathFilter::Kind::TrackerMismatch,
+++                     StringRef( filter->filter ),
+++                     0 };
++         }
++-        m_testSpec = parser.testSpec();
++-
++-
++-        // We now fixup the reporter specs to handle default output spec,
++-        // default colour spec, etc
++-        bool defaultOutputUsed = false;
++-        for ( auto const& reporterSpec : m_data.reporterSpecifications ) {
++-            // We do the default-output check separately, while always
++-            // using the default output below to make the code simpler
++-            // and avoid superfluous copies.
++-            if ( reporterSpec.outputFile().none() ) {
++-                CATCH_ENFORCE( !defaultOutputUsed,
++-                               "Internal error: cannot use default output for "
++-                               "multiple reporters" );
++-                defaultOutputUsed = true;
++-            }
+++
+++        if ( filter->type == PathFilter::For::Section ) {
+++            return { ResolvedPathFilter::Kind::Section,
+++                     StringRef( filter->filter ),
+++                     0 };
+++        }
+++
+++        if ( filter->filter == "*" ) {
+++            return { ResolvedPathFilter::Kind::GeneratorWildcard,
+++                     StringRef( filter->filter ),
+++                     0 };
+++        }
+++
+++        auto parsedIndex = parseUInt( filter->filter );
+++        CATCH_ENFORCE(
+++            parsedIndex,
+++            "Invariant violation: generator path filters should contain "
+++            "validated unsigned indices" );
+++        return { ResolvedPathFilter::Kind::GeneratorIndex,
+++                 StringRef( filter->filter ),
+++                 *parsedIndex };
+++    }
+++
++ 
++             m_processedReporterSpecs.push_back( ProcessedReporterSpec{
++                 reporterSpec.name(),
++diff --git a/src/catch2/catch_config.hpp b/src/catch2/catch_config.hpp
++index c3fea561..14c36767 100644
++--- a/src/catch2/catch_config.hpp
+++++ b/src/catch2/catch_config.hpp
++@@ -18,7 +18,6 @@
++ #include <catch2/internal/catch_reporter_spec_parser.hpp>
++ 
++ #include <chrono>
++-#include <map>
++ #include <string>
++ #include <vector>
++ 
++@@ -44,30 +43,31 @@ namespace Catch {
++         }
++     };
++ 
++-    struct ConfigData {
++-
++-        bool listTests = false;
++-        bool listTags = false;
++-        bool listReporters = false;
++-        bool listListeners = false;
++-
++-        bool showSuccessfulTests = false;
++-        bool shouldDebugBreak = false;
++-        bool noThrow = false;
++-        bool showHelp = false;
++-        bool showInvisibles = false;
++-        bool filenamesAsTags = false;
++-        bool libIdentify = false;
++-        bool allowZeroTests = false;
++-
++-        int abortAfter = -1;
++-        uint32_t rngSeed = generateRandomSeed(GenerateFrom::Default);
+++    struct ResolvedPathFilter {
+++        enum class Kind {
+++            None,
+++            TrackerMismatch,
+++            Section,
+++            GeneratorWildcard,
+++            GeneratorIndex,
+++        };
+++
+++        Kind kind = Kind::None;
+++        StringRef filter;
+++        std::size_t generatorIndex = 0;
+++    };
++ 
++-        unsigned int shardCount = 1;
++-        unsigned int shardIndex = 0;
+++    PathFilter const* pathFilterAtDepth(
+++        std::vector<PathFilter> const& pathFilters,
+++        std::size_t depth );
+++    ResolvedPathFilter resolveActivePathFilter(
+++        std::vector<PathFilter> const& pathFilters,
+++        bool useNewFilterBehaviour,
+++        std::size_t allTrackerDepth,
+++        std::size_t sectionOnlyDepth,
+++        PathFilter::For trackerType );
++ 
++-        bool skipBenchmarks = false;
++-        bool benchmarkNoAnalysis = false;
+++    struct ConfigData {
++         unsigned int benchmarkSamples = 100;
++         double benchmarkConfidenceInterval = 0.95;
++         unsigned int benchmarkResamples = 100'000;
++diff --git a/src/catch2/internal/catch_run_context.cpp b/src/catch2/internal/catch_run_context.cpp
++index a435170f..800910cf 100644
++--- a/src/catch2/internal/catch_run_context.cpp
+++++ b/src/catch2/internal/catch_run_context.cpp
++@@ -7,7 +7,6 @@
++ // SPDX-License-Identifier: BSL-1.0
++ #include <catch2/internal/catch_run_context.hpp>
++ 
++-#include <catch2/catch_user_config.hpp>
++ #include <catch2/generators/catch_generators_throw.hpp>
++ #include <catch2/interfaces/catch_interfaces_config.hpp>
++ #include <catch2/interfaces/catch_interfaces_generatortracker.hpp>
++@@ -52,6 +51,7 @@ namespace Catch {
++                     assert( m_generator &&
++                             "Cannot create tracker without generator" );
++ 
+++                    // Handle potential filter and move forward here...
++                     // Handle potential filter and move forward here...
++                     // Old style filters do not affect generators at all
++                     if (m_newStyleFilters && m_allTrackerDepth < m_filterRef->size()) {
++@@ -158,26 +158,20 @@ namespace Catch {
++                         // No filters left -> no restrictions on running sections
++                         size_t childDepth = 1 + (m_newStyleFilters ? m_allTrackerDepth : m_sectionOnlyDepth);
++                         if ( childDepth >= m_filterRef->size() ) {
++-                            return true;
++-                        }
++-
++-                        // If we are using the new style filters, we need to check
++-                        // whether the successive filter is for section or a generator.
++                         if ( m_newStyleFilters
++                             && (*m_filterRef)[childDepth].type != PathFilter::For::Section ) {
++                             return false;
++                         }
++                         // Look for any child section that could match the remaining filters
++                         for ( auto const& child : m_children ) {
++-                            if ( child->isSectionTracker() &&
+++                            && (*m_filterRef)[childDepth].type != PathFilter::For::Section ) {
++                                  static_cast<SectionTracker const&>( *child )
++                                          .trimmedName() == StringRef((*m_filterRef)[childDepth].filter) ) {
++                                 return true;
++                             }
++                         }
++                         return false;
++-                    }();
++-
+++                                         .trimmedName() == StringRef((*m_filterRef)[childDepth].filter) ) {
++                     // This check is a bit tricky, because m_generator->next()
++                     // has a side-effect, where it consumes generator's current
++                     // value, but we do not want to invoke the side-effect if
++diff --git a/src/catch2/internal/catch_test_case_tracker.cpp b/src/catch2/internal/catch_test_case_tracker.cpp
++index 05bfff8e..56d924de 100644
++--- a/src/catch2/internal/catch_test_case_tracker.cpp
+++++ b/src/catch2/internal/catch_test_case_tracker.cpp
++@@ -7,7 +7,6 @@
++ // SPDX-License-Identifier: BSL-1.0
++ #include <catch2/internal/catch_test_case_tracker.hpp>
++ 
++-#include <catch2/internal/catch_enforce.hpp>
++ #include <catch2/internal/catch_move_and_forward.hpp>
++ #include <catch2/internal/catch_path_filter.hpp>
++ #include <catch2/internal/catch_string_manip.hpp>
++@@ -178,7 +177,8 @@ namespace TestCaseTracking {
++ 
++     bool SectionTracker::isComplete() const {
++         // If there are active filters AND we do not pass them,
++-        // the section is always "completed"
+++                                          PathFilter::For::Section ) {
+++                return true;
++         const size_t filterIndex =
++             m_newStyleFilters ? m_allTrackerDepth : m_sectionOnlyDepth;
++         if ( filterIndex < m_filterRef->size() ) {
++diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
++index 7429734f..99607e8b 100644
++--- a/tests/CMakeLists.txt
+++++ b/tests/CMakeLists.txt
++@@ -83,7 +83,7 @@ set(TEST_SOURCES
++   ${SELF_TEST_DIR}/IntrospectiveTests/Json.tests.cpp
++   ${SELF_TEST_DIR}/IntrospectiveTests/Parse.tests.cpp
++   ${SELF_TEST_DIR}/IntrospectiveTests/PartTracker.tests.cpp
++-  ${SELF_TEST_DIR}/IntrospectiveTests/RandomNumberGeneration.tests.cpp
+++  ${SELF_TEST_DIR}/IntrospectiveTests/PathFilteringPerformance.tests.cpp
++   ${SELF_TEST_DIR}/IntrospectiveTests/Reporters.tests.cpp
++   ${SELF_TEST_DIR}/IntrospectiveTests/Tag.tests.cpp
++   ${SELF_TEST_DIR}/IntrospectiveTests/TestCaseInfoHasher.tests.cpp
++diff --git a/tests/SelfTest/IntrospectiveTests/PathFilteringPerformance.tests.cpp b/tests/SelfTest/IntrospectiveTests/PathFilteringPerformance.tests.cpp
++new file mode 100644
++index 00000000..e4cf3b54
++--- /dev/null
+++++ b/tests/SelfTest/IntrospectiveTests/PathFilteringPerformance.tests.cpp
++@@ -0,0 +1,42 @@
+++#include <catch2/catch_test_macros.hpp>
+++#include <catch2/catch_config.hpp>
+++#include <catch2/internal/catch_path_filter.hpp>
+++
+++TEST_CASE( "Path filtering resolution performance and logic", "[config][filter][performance]" ) {
+++    using namespace Catch;
+++
+++    SECTION( "Resolve Active Path Filter" ) {
+++        std::vector<PathFilter> filters;
+++        filters.emplace_back(PathFilter::For::Section, "section1");
+++        filters.emplace_back(PathFilter::For::Generator, "5");
+++        filters.emplace_back(PathFilter::For::Section, "subsection");
+++
+++        // When not using new filter behaviour, generator filters are ignored
+++        auto filter1 = resolveActivePathFilter(filters, false, 1, 1, PathFilter::For::Generator);
+++        REQUIRE( filter1.kind == ResolvedPathFilter::Kind::None );
+++
+++        // When using new filter behaviour
+++        auto filter2 = resolveActivePathFilter(filters, true, 1, 1, PathFilter::For::Generator);
+++        REQUIRE( filter2.kind == ResolvedPathFilter::Kind::GeneratorIndex );
+++        REQUIRE( filter2.generatorIndex == 5 );
+++        REQUIRE( filter2.filter == "5" );
+++
+++        auto filter3 = resolveActivePathFilter(filters, true, 0, 0, PathFilter::For::Section);
+++        REQUIRE( filter3.kind == ResolvedPathFilter::Kind::Section );
+++        REQUIRE( filter3.filter == "section1" );
+++
+++        // Tracker mismatch
+++        auto filter4 = resolveActivePathFilter(filters, true, 0, 0, PathFilter::For::Generator);
+++        REQUIRE( filter4.kind == ResolvedPathFilter::Kind::TrackerMismatch );
+++        REQUIRE( filter4.filter == "section1" );
+++    }
+++
+++    SECTION( "Wildcard generator filter" ) {
+++        std::vector<PathFilter> filters;
+++        filters.emplace_back(PathFilter::For::Generator, "*");
+++
+++        auto filter = resolveActivePathFilter(filters, true, 0, 0, PathFilter::For::Generator);
+++        REQUIRE( filter.kind == ResolvedPathFilter::Kind::GeneratorWildcard );
+++        REQUIRE( filter.filter == "*" );
+++    }
+++}
+diff --git a/src/catch2/catch_config.cpp b/src/catch2/catch_config.cpp
+index b4584f3c..5db920d4 100644
+--- a/src/catch2/catch_config.cpp
++++ b/src/catch2/catch_config.cpp
+@@ -96,61 +96,6 @@ namespace Catch {
+         return lhs.type == rhs.type && lhs.filter == rhs.filter;
+     }
+ 
+-    Config::Config( ConfigData const& data ):
+-        m_data( data ) {
+-        // We need to trim filter specs to avoid trouble with superfluous
+-        // whitespace (esp. important for bdd macros, as those are manually
+-        // aligned with whitespace).
+-
+-        for (auto& elem : m_data.testsOrTags) {
+-            elem = trim(elem);
+-        }
+-
+-        // Insert the default reporter if user hasn't asked for a specific one
+-        if ( m_data.reporterSpecifications.empty() ) {
+-#if defined( CATCH_CONFIG_DEFAULT_REPORTER )
+-            const auto default_spec = CATCH_CONFIG_DEFAULT_REPORTER;
+-#else
+-            const auto default_spec = "console";
+-#endif
+-            auto parsed = parseReporterSpec(default_spec);
+-            CATCH_ENFORCE( parsed,
+-                           "Cannot parse the provided default reporter spec: '"
+-                               << default_spec << '\'' );
+-            m_data.reporterSpecifications.push_back( std::move( *parsed ) );
+-        }
+-
+-        // Reading bazel env vars can change some parts of the config data,
+-        // so we have to process the bazel env before acting on the config.
+-        if ( enableBazelEnvSupport() ) {
+-            readBazelEnvVars();
+-        }
+-
+-        // Bazel support can modify the test specs, so parsing has to happen
+-        // after reading Bazel env vars.
+-        TestSpecParser parser( ITagAliasRegistry::get() );
+-        if ( !m_data.testsOrTags.empty() ) {
+-            m_hasTestFilters = true;
+-            for ( auto const& testOrTags : m_data.testsOrTags ) {
+-                parser.parse( testOrTags );
+-            }
+-        }
+-        m_testSpec = parser.testSpec();
+-
+-
+-        // We now fixup the reporter specs to handle default output spec,
+-        // default colour spec, etc
+-        bool defaultOutputUsed = false;
+-        for ( auto const& reporterSpec : m_data.reporterSpecifications ) {
+-            // We do the default-output check separately, while always
+-            // using the default output below to make the code simpler
+-            // and avoid superfluous copies.
+-            if ( reporterSpec.outputFile().none() ) {
+-                CATCH_ENFORCE( !defaultOutputUsed,
+-                               "Internal error: cannot use default output for "
+-                               "multiple reporters" );
+-                defaultOutputUsed = true;
+-            }
+ 
+             m_processedReporterSpecs.push_back( ProcessedReporterSpec{
+                 reporterSpec.name(),
+@@ -173,6 +118,30 @@ namespace Catch {
+     std::vector<PathFilter> const& Config::getPathFilters() const { return m_data.pathFilters; }
+     bool Config::useNewFilterBehaviour() const { return m_data.useNewPathFilteringBehaviour; }
+ 
++    bool Config::validatePathFilters() const {
++        if ( m_data.pathFilters.empty() ) {
++            return true;
++        }
++        auto parsed = parsePathFilters( m_data.pathFilters );
++        for ( auto const& pf : parsed ) {
++            if ( pf.type == PathFilter::For::Generator &&
++                 pf.filter != "*" ) {
++                if ( !pf.generatorIndex ) {
++                    return false;
++                }
++            }
++        }
++        return true;
++    }
++
++    PathFilterStats Config::getPathFilterStats() const {
++        return computePathFilterStats( m_data.pathFilters );
++    }
++
++    std::vector<ParsedFilter> Config::getParsedPathFilters() const {
++        return parsePathFilters( m_data.pathFilters );
++    }
++
+     std::vector<ReporterSpec> const& Config::getReporterSpecs() const {
+         return m_data.reporterSpecifications;
+     }
+diff --git a/src/catch2/catch_config.hpp b/src/catch2/catch_config.hpp
+index c3fea561..f0f7b719 100644
+--- a/src/catch2/catch_config.hpp
++++ b/src/catch2/catch_config.hpp
+@@ -43,31 +43,6 @@ namespace Catch {
+             return !( lhs == rhs );
+         }
+     };
+-
+-    struct ConfigData {
+-
+-        bool listTests = false;
+-        bool listTags = false;
+-        bool listReporters = false;
+-        bool listListeners = false;
+-
+-        bool showSuccessfulTests = false;
+-        bool shouldDebugBreak = false;
+-        bool noThrow = false;
+-        bool showHelp = false;
+-        bool showInvisibles = false;
+-        bool filenamesAsTags = false;
+-        bool libIdentify = false;
+-        bool allowZeroTests = false;
+-
+-        int abortAfter = -1;
+-        uint32_t rngSeed = generateRandomSeed(GenerateFrom::Default);
+-
+-        unsigned int shardCount = 1;
+-        unsigned int shardIndex = 0;
+-
+-        bool skipBenchmarks = false;
+-        bool benchmarkNoAnalysis = false;
+         unsigned int benchmarkSamples = 100;
+         double benchmarkConfidenceInterval = 0.95;
+         unsigned int benchmarkResamples = 100'000;
+@@ -147,6 +122,10 @@ namespace Catch {
+         unsigned int benchmarkResamples() const override;
+         std::chrono::milliseconds benchmarkWarmupTime() const override;
+ 
++        bool validatePathFilters() const;
++        PathFilterStats getPathFilterStats() const;
++        std::vector<ParsedFilter> getParsedPathFilters() const;
++
+     private:
+         // Reads Bazel env vars and applies them to the config
+         void readBazelEnvVars();
+diff --git a/src/catch2/internal/catch_path_filter.hpp b/src/catch2/internal/catch_path_filter.hpp
+index 9040efec..ecb56a58 100644
+--- a/src/catch2/internal/catch_path_filter.hpp
++++ b/src/catch2/internal/catch_path_filter.hpp
+@@ -9,8 +9,12 @@
+ #define CATCH_PATH_FILTER_HPP_INCLUDED
+ 
+ #include <catch2/internal/catch_move_and_forward.hpp>
++#include <catch2/internal/catch_optional.hpp>
++#include <catch2/internal/catch_parse_numbers.hpp>
+ 
++#include <cstddef>
+ #include <string>
++#include <vector>
+ 
+ namespace Catch {
+ 
+@@ -28,6 +32,50 @@ namespace Catch {
+         friend bool operator==( PathFilter const& lhs, PathFilter const& rhs );
+     };
+ 
++    struct ParsedFilter {
++        PathFilter::For type;
++        std::string filter;
++        Optional<unsigned int> generatorIndex;
++    };
++
++    struct PathFilterStats {
++        std::size_t sectionFilterCount = 0;
++        std::size_t generatorFilterCount = 0;
++        bool hasWildcardGeneratorFilter = false;
++    };
++
++    inline PathFilterStats computePathFilterStats(
++        std::vector<PathFilter> const& filters ) {
++        PathFilterStats stats;
++        for ( auto const& f : filters ) {
++            if ( f.type == PathFilter::For::Section ) {
++                ++stats.sectionFilterCount;
++            } else {
++                ++stats.generatorFilterCount;
++                if ( f.filter == "*" ) {
++                    stats.hasWildcardGeneratorFilter = true;
++                }
++            }
++        }
++        return stats;
++    }
++
++    inline std::vector<ParsedFilter> parsePathFilters(
++        std::vector<PathFilter> const& filters ) {
++        std::vector<ParsedFilter> parsed;
++        parsed.reserve( filters.size() );
++        for ( auto const& f : filters ) {
++            ParsedFilter pf;
++            pf.type = f.type;
++            pf.filter = f.filter;
++            if ( f.type == PathFilter::For::Generator && f.filter != "*" ) {
++                pf.generatorIndex = parseUInt( f.filter, 0 );
++            }
++            parsed.push_back( CATCH_MOVE( pf ) );
++        }
++        return parsed;
++    }
++
+ } // end namespace Catch
+ 
+ #endif // CATCH_PATH_FILTER_HPP_INCLUDED
+diff --git a/src/catch2/internal/catch_run_context.cpp b/src/catch2/internal/catch_run_context.cpp
+index a435170f..85b327f4 100644
+--- a/src/catch2/internal/catch_run_context.cpp
++++ b/src/catch2/internal/catch_run_context.cpp
+@@ -52,17 +52,10 @@ namespace Catch {
+                     assert( m_generator &&
+                             "Cannot create tracker without generator" );
+ 
+-                    // Handle potential filter and move forward here...
+-                    // Old style filters do not affect generators at all
+                     if (m_newStyleFilters && m_allTrackerDepth < m_filterRef->size()) {
+                         auto const& filter =
+                             ( *m_filterRef )[m_allTrackerDepth];
+-                        // Generator cannot be un-entered the way a section
+-                        // can be, so the tracker has to throw for a wrong
+-                        // filter to stop the execution flow.
+                         if (filter.type == PathFilter::For::Section) {
+-                            // We want the semantics of `SKIP()`, but we inline it
+-                            // to avoid issues with conditionally prefixed macros
+                             INTERNAL_CATCH_MSG(
+                                 "SKIP",
+                                 Catch::ResultWas::ExplicitSkip,
+@@ -70,16 +63,14 @@ namespace Catch {
+                                 "" );
+                             Catch::Detail::Unreachable();
+                         }
+-                        // '*' is the wildcard for "all elements in generator"
+-                        // used for filtering sections below the generator, but
+-                        // not the generator itself.
+                         if ( filter.filter != "*" ) {
+                             m_isFiltered = true;
+-                            // TBD: We assume that the filter was validated as
+-                            //      number during parsing. We should pass it
+-                            //      as number from the CLI parser.
+-                            size_t targetIndex = std::stoul( filter.filter );
+-                            m_generator->skipToNthElement( targetIndex );
++                            auto targetIndex = parseUInt( filter.filter, 0 );
++                            if ( !targetIndex ) {
++                                Detail::throw_generator_exception(
++                                    "Invalid generator filter index" );
++                            }
++                            m_generator->skipToNthElement( *targetIndex );
+                         }
+                     }
+                 }
+diff --git a/tests/CMakeLists.txt b/tests/CMakeLists.txt
+index 7429734f..f73c47de 100644
+--- a/tests/CMakeLists.txt
++++ b/tests/CMakeLists.txt
+@@ -83,7 +83,7 @@ set(TEST_SOURCES
+   ${SELF_TEST_DIR}/IntrospectiveTests/Json.tests.cpp
+   ${SELF_TEST_DIR}/IntrospectiveTests/Parse.tests.cpp
+   ${SELF_TEST_DIR}/IntrospectiveTests/PartTracker.tests.cpp
+-  ${SELF_TEST_DIR}/IntrospectiveTests/RandomNumberGeneration.tests.cpp
++  ${SELF_TEST_DIR}/IntrospectiveTests/PathFilter.tests.cpp
+   ${SELF_TEST_DIR}/IntrospectiveTests/Reporters.tests.cpp
+   ${SELF_TEST_DIR}/IntrospectiveTests/Tag.tests.cpp
+   ${SELF_TEST_DIR}/IntrospectiveTests/TestCaseInfoHasher.tests.cpp
+diff --git a/tests/SelfTest/IntrospectiveTests/PathFilter.tests.cpp b/tests/SelfTest/IntrospectiveTests/PathFilter.tests.cpp
+new file mode 100644
+index 00000000..86c6ed6c
+--- /dev/null
++++ b/tests/SelfTest/IntrospectiveTests/PathFilter.tests.cpp
+@@ -0,0 +1,282 @@
++//              Copyright Catch2 Authors
++// Distributed under the Boost Software License, Version 1.0.
++//   (See accompanying file LICENSE.txt or copy at
++//        https://www.boost.org/LICENSE_1_0.txt)
++
++// SPDX-License-Identifier: BSL-1.0
++
++#include <catch2/catch_test_macros.hpp>
++#include <catch2/internal/catch_path_filter.hpp>
++#include <catch2/catch_config.hpp>
++#include <catch2/generators/catch_generators.hpp>
++#include <catch2/generators/catch_generators_adapters.hpp>
++
++#include <vector>
++
++using namespace Catch;
++
++TEST_CASE("computePathFilterStats counts filter types", "[path-filter][stats]") {
++    SECTION("empty filters") {
++        std::vector<PathFilter> empty;
++        auto stats = computePathFilterStats(empty);
++        REQUIRE(stats.sectionFilterCount == 0);
++        REQUIRE(stats.generatorFilterCount == 0);
++        REQUIRE_FALSE(stats.hasWildcardGeneratorFilter);
++    }
++
++    SECTION("only section filters") {
++        std::vector<PathFilter> filters;
++        filters.emplace_back(PathFilter::For::Section, "A");
++        filters.emplace_back(PathFilter::For::Section, "B");
++        auto stats = computePathFilterStats(filters);
++        REQUIRE(stats.sectionFilterCount == 2);
++        REQUIRE(stats.generatorFilterCount == 0);
++        REQUIRE_FALSE(stats.hasWildcardGeneratorFilter);
++    }
++
++    SECTION("only generator filters") {
++        std::vector<PathFilter> filters;
++        filters.emplace_back(PathFilter::For::Generator, "3");
++        filters.emplace_back(PathFilter::For::Generator, "7");
++        auto stats = computePathFilterStats(filters);
++        REQUIRE(stats.sectionFilterCount == 0);
++        REQUIRE(stats.generatorFilterCount == 2);
++        REQUIRE_FALSE(stats.hasWildcardGeneratorFilter);
++    }
++
++    SECTION("wildcard generator filter") {
++        std::vector<PathFilter> filters;
++        filters.emplace_back(PathFilter::For::Generator, "*");
++        auto stats = computePathFilterStats(filters);
++        REQUIRE(stats.generatorFilterCount == 1);
++        REQUIRE(stats.hasWildcardGeneratorFilter);
++    }
++
++    SECTION("mixed filters") {
++        std::vector<PathFilter> filters;
++        filters.emplace_back(PathFilter::For::Section, "A");
++        filters.emplace_back(PathFilter::For::Generator, "5");
++        filters.emplace_back(PathFilter::For::Section, "B");
++        filters.emplace_back(PathFilter::For::Generator, "*");
++        auto stats = computePathFilterStats(filters);
++        REQUIRE(stats.sectionFilterCount == 2);
++        REQUIRE(stats.generatorFilterCount == 2);
++        REQUIRE(stats.hasWildcardGeneratorFilter);
++    }
++}
++
++TEST_CASE("parsePathFilters parses generator indices", "[path-filter][parse]") {
++    SECTION("empty filters") {
++        std::vector<PathFilter> empty;
++        auto parsed = parsePathFilters(empty);
++        REQUIRE(parsed.empty());
++    }
++
++    SECTION("section filters are not parsed as indices") {
++        std::vector<PathFilter> filters;
++        filters.emplace_back(PathFilter::For::Section, "A");
++        auto parsed = parsePathFilters(filters);
++        REQUIRE(parsed.size() == 1);
++        REQUIRE(parsed[0].type == PathFilter::For::Section);
++        REQUIRE(parsed[0].filter == "A");
++        REQUIRE_FALSE(parsed[0].generatorIndex);
++    }
++
++    SECTION("generator filter with numeric index") {
++        std::vector<PathFilter> filters;
++        filters.emplace_back(PathFilter::For::Generator, "42");
++        auto parsed = parsePathFilters(filters);
++        REQUIRE(parsed.size() == 1);
++        REQUIRE(parsed[0].type == PathFilter::For::Generator);
++        REQUIRE(parsed[0].filter == "42");
++        REQUIRE(parsed[0].generatorIndex);
++        REQUIRE(*parsed[0].generatorIndex == 42);
++    }
++
++    SECTION("wildcard generator filter is not parsed as index") {
++        std::vector<PathFilter> filters;
++        filters.emplace_back(PathFilter::For::Generator, "*");
++        auto parsed = parsePathFilters(filters);
++        REQUIRE(parsed.size() == 1);
++        REQUIRE(parsed[0].type == PathFilter::For::Generator);
++        REQUIRE(parsed[0].filter == "*");
++        REQUIRE_FALSE(parsed[0].generatorIndex);
++    }
++
++    SECTION("non-numeric generator filter") {
++        std::vector<PathFilter> filters;
++        filters.emplace_back(PathFilter::For::Generator, "abc");
++        auto parsed = parsePathFilters(filters);
++        REQUIRE(parsed.size() == 1);
++        REQUIRE(parsed[0].type == PathFilter::For::Generator);
++        REQUIRE_FALSE(parsed[0].generatorIndex);
++    }
++
++    SECTION("mixed filters preserve order") {
++        std::vector<PathFilter> filters;
++        filters.emplace_back(PathFilter::For::Section, "A");
++        filters.emplace_back(PathFilter::For::Generator, "3");
++        filters.emplace_back(PathFilter::For::Section, "B");
++        filters.emplace_back(PathFilter::For::Generator, "*");
++        auto parsed = parsePathFilters(filters);
++        REQUIRE(parsed.size() == 4);
++        REQUIRE(parsed[0].type == PathFilter::For::Section);
++        REQUIRE(parsed[1].type == PathFilter::For::Generator);
++        REQUIRE(*parsed[1].generatorIndex == 3);
++        REQUIRE(parsed[2].type == PathFilter::For::Section);
++        REQUIRE(parsed[3].type == PathFilter::For::Generator);
++        REQUIRE_FALSE(parsed[3].generatorIndex);
++    }
++}
++
++TEST_CASE("Config unified filter interface", "[path-filter][config]") {
++    ConfigData data;
++    data.useNewPathFilteringBehaviour = true;
++
++    SECTION("validatePathFilters with empty filters") {
++        Config config(data);
++        REQUIRE(config.validatePathFilters());
++    }
++
++    SECTION("validatePathFilters with valid generator indices") {
++        data.pathFilters.emplace_back(PathFilter::For::Section, "A");
++        data.pathFilters.emplace_back(PathFilter::For::Generator, "3");
++        Config config(data);
++        REQUIRE(config.validatePathFilters());
++    }
++
++    SECTION("validatePathFilters with invalid generator index") {
++        data.pathFilters.emplace_back(PathFilter::For::Generator, "abc");
++        Config config(data);
++        REQUIRE_FALSE(config.validatePathFilters());
++    }
++
++    SECTION("validatePathFilters with wildcard generator") {
++        data.pathFilters.emplace_back(PathFilter::For::Generator, "*");
++        Config config(data);
++        REQUIRE(config.validatePathFilters());
++    }
++
++    SECTION("getPathFilterStats returns correct counts") {
++        data.pathFilters.emplace_back(PathFilter::For::Section, "A");
++        data.pathFilters.emplace_back(PathFilter::For::Generator, "3");
++        data.pathFilters.emplace_back(PathFilter::For::Section, "B");
++        Config config(data);
++        auto stats = config.getPathFilterStats();
++        REQUIRE(stats.sectionFilterCount == 2);
++        REQUIRE(stats.generatorFilterCount == 1);
++    }
++
++    SECTION("getParsedPathFilters returns parsed data") {
++        data.pathFilters.emplace_back(PathFilter::For::Section, "A");
++        data.pathFilters.emplace_back(PathFilter::For::Generator, "7");
++        Config config(data);
++        auto parsed = config.getParsedPathFilters();
++        REQUIRE(parsed.size() == 2);
++        REQUIRE(parsed[0].type == PathFilter::For::Section);
++        REQUIRE(parsed[1].type == PathFilter::For::Generator);
++        REQUIRE(parsed[1].generatorIndex);
++        REQUIRE(*parsed[1].generatorIndex == 7);
++    }
++
++    SECTION("getPathFilterStats with empty config") {
++        Config config(data);
++        auto stats = config.getPathFilterStats();
++        REQUIRE(stats.sectionFilterCount == 0);
++        REQUIRE(stats.generatorFilterCount == 0);
++    }
++
++    SECTION("getParsedPathFilters with empty config") {
++        Config config(data);
++        auto parsed = config.getParsedPathFilters();
++        REQUIRE(parsed.empty());
++    }
++
++    SECTION("useNewFilterBehaviour is reflected") {
++        Config config(data);
++        REQUIRE(config.useNewFilterBehaviour());
++    }
++
++    SECTION("old-style filters still work") {
++        ConfigData oldData;
++        Config config(oldData);
++        REQUIRE_FALSE(config.useNewFilterBehaviour());
++        REQUIRE(config.validatePathFilters());
++    }
++}
++
++TEST_CASE("TakeGenerator skip interaction with filter validation",
++          "[path-filter][generators][take][performance]") {
++    using namespace Catch::Generators;
++
++    SECTION("skip within bounds uses TakeGenerator::skipToNthElementImpl") {
++        TakeGenerator<int> take(
++            10, values({0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12}));
++        REQUIRE(take.currentElementIndex() == 0);
++
++        take.skipToNthElement(5);
++        REQUIRE(take.currentElementIndex() == 5);
++        REQUIRE(take.get() == 5);
++    }
++
++    SECTION("skip beyond TakeGenerator bounds throws") {
++        TakeGenerator<int> take(
++            5, values({0, 1, 2, 3, 4, 5, 6, 7, 8, 9}));
++        REQUIRE_THROWS(take.skipToNthElement(7));
++    }
++
++    SECTION("skip to same element is no-op") {
++        TakeGenerator<int> take(
++            10, values({0, 1, 2, 3, 4, 5, 6, 7, 8, 9}));
++        take.skipToNthElement(3);
++        REQUIRE(take.currentElementIndex() == 3);
++
++        take.skipToNthElement(3);
++        REQUIRE(take.currentElementIndex() == 3);
++        REQUIRE(take.get() == 3);
++    }
++
++    SECTION("skip backwards in TakeGenerator throws") {
++        TakeGenerator<int> take(
++            10, values({0, 1, 2, 3, 4, 5, 6, 7, 8, 9}));
++        take.skipToNthElement(5);
++        REQUIRE_THROWS(take.skipToNthElement(3));
++    }
++}
++
++TEST_CASE("Filter stats reflect filter depth for generators",
++          "[path-filter][generators][depth]") {
++    SECTION("filter depth matches generator nesting") {
++        std::vector<PathFilter> filters;
++        filters.emplace_back(PathFilter::For::Section, "A");
++        filters.emplace_back(PathFilter::For::Generator, "3");
++        filters.emplace_back(PathFilter::For::Section, "B");
++        filters.emplace_back(PathFilter::For::Generator, "*");
++
++        auto stats = computePathFilterStats(filters);
++        REQUIRE(stats.sectionFilterCount == 2);
++        REQUIRE(stats.generatorFilterCount == 2);
++        REQUIRE(stats.hasWildcardGeneratorFilter);
++    }
++}
++
++TEST_CASE("Parsed filter preserves generator index for runtime use",
++          "[path-filter][generators][runtime]") {
++    using namespace Catch::Generators;
++
++    SECTION("parsed filter index can be used with skipToNthElement") {
++        std::vector<PathFilter> filters;
++        filters.emplace_back(PathFilter::For::Generator, "4");
++
++        auto parsed = parsePathFilters(filters);
++        REQUIRE(parsed.size() == 1);
++        REQUIRE(parsed[0].generatorIndex);
++        auto targetIndex = static_cast<std::size_t>(*parsed[0].generatorIndex);
++
++        TakeGenerator<int> take(
++            10, values({0, 1, 2, 3, 4, 5, 6, 7, 8, 9}));
++        take.skipToNthElement(targetIndex);
++        REQUIRE(take.currentElementIndex() == 4);
++        REQUIRE(take.get() == 4);
++    }
++}
+\ No newline at end of file

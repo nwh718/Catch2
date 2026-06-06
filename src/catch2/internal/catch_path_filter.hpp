@@ -10,11 +10,7 @@
 
 #include <catch2/internal/catch_move_and_forward.hpp>
 
-#include <string>
 
-namespace Catch {
-
-    struct PathFilter {
         enum class For {
             Section,
             Generator,

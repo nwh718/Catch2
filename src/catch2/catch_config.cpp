@@ -96,6 +96,60 @@ namespace Catch {
         return lhs.type == rhs.type && lhs.filter == rhs.filter;
     }
 
+    PathFilter const* pathFilterAtDepth(
+        std::vector<PathFilter> const& pathFilters,
+        std::size_t depth ) {
+        if ( depth >= pathFilters.size() ) {
+            return nullptr;
+        }
+        return &pathFilters[depth];
+    }
+
+    ResolvedPathFilter resolveActivePathFilter(
+        std::vector<PathFilter> const& pathFilters,
+        bool useNewFilterBehaviour,
+        std::size_t allTrackerDepth,
+        std::size_t sectionOnlyDepth,
+        PathFilter::For trackerType ) {
+        if ( !useNewFilterBehaviour && trackerType == PathFilter::For::Generator ) {
+            return {};
+        }
+
+        auto const filterDepth =
+            useNewFilterBehaviour ? allTrackerDepth : sectionOnlyDepth;
+        auto const* filter = pathFilterAtDepth( pathFilters, filterDepth );
+        if ( !filter ) {
+            return {};
+        }
+
+        if ( useNewFilterBehaviour && filter->type != trackerType ) {
+            return { ResolvedPathFilter::Kind::TrackerMismatch,
+                     StringRef( filter->filter ),
+                     0 };
+        }
+
+        if ( filter->type == PathFilter::For::Section ) {
+            return { ResolvedPathFilter::Kind::Section,
+                     StringRef( filter->filter ),
+                     0 };
+        }
+
+        if ( filter->filter == "*" ) {
+            return { ResolvedPathFilter::Kind::GeneratorWildcard,
+                     StringRef( filter->filter ),
+                     0 };
+        }
+
+        auto parsedIndex = parseUInt( filter->filter );
+        CATCH_ENFORCE(
+            parsedIndex,
+            "Invariant violation: generator path filters should contain "
+            "validated unsigned indices" );
+        return { ResolvedPathFilter::Kind::GeneratorIndex,
+                 StringRef( filter->filter ),
+                 *parsedIndex };
+    }
+
     Config::Config( ConfigData const& data ):
         m_data( data ) {
         // We need to trim filter specs to avoid trouble with superfluous
@@ -118,30 +172,6 @@ namespace Catch {
                            "Cannot parse the provided default reporter spec: '"
                                << default_spec << '\'' );
             m_data.reporterSpecifications.push_back( std::move( *parsed ) );
-        }
-
-        // Reading bazel env vars can change some parts of the config data,
-        // so we have to process the bazel env before acting on the config.
-        if ( enableBazelEnvSupport() ) {
-            readBazelEnvVars();
-        }
-
-        // Bazel support can modify the test specs, so parsing has to happen
-        // after reading Bazel env vars.
-        TestSpecParser parser( ITagAliasRegistry::get() );
-        if ( !m_data.testsOrTags.empty() ) {
-            m_hasTestFilters = true;
-            for ( auto const& testOrTags : m_data.testsOrTags ) {
-                parser.parse( testOrTags );
-            }
-        }
-        m_testSpec = parser.testSpec();
-
-
-        // We now fixup the reporter specs to handle default output spec,
-        // default colour spec, etc
-        bool defaultOutputUsed = false;
-        for ( auto const& reporterSpec : m_data.reporterSpecifications ) {
             // We do the default-output check separately, while always
             // using the default output below to make the code simpler
             // and avoid superfluous copies.
