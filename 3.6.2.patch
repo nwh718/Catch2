@@ -1,0 +1,179 @@
+diff --git a/src/CMakeLists.txt b/src/CMakeLists.txt
+index 0ed64ebf..e2b10332 100644
+--- a/src/CMakeLists.txt
++++ b/src/CMakeLists.txt
+@@ -151,6 +151,7 @@ set(IMPL_HEADERS
+   ${SOURCES_DIR}/internal/catch_unique_ptr.hpp
+   ${SOURCES_DIR}/internal/catch_unreachable.hpp
+   ${SOURCES_DIR}/internal/catch_void_type.hpp
++  ${SOURCES_DIR}/internal/catch_wildcard_matcher.hpp
+   ${SOURCES_DIR}/internal/catch_wildcard_pattern.hpp
+   ${SOURCES_DIR}/internal/catch_windows_h_proxy.hpp
+   ${SOURCES_DIR}/internal/catch_xmlwriter.hpp
+@@ -218,6 +219,7 @@ set(IMPL_SOURCES
+   ${SOURCES_DIR}/internal/catch_test_spec_parser.cpp
+   ${SOURCES_DIR}/internal/catch_textflow.cpp
+   ${SOURCES_DIR}/internal/catch_uncaught_exceptions.cpp
++  ${SOURCES_DIR}/internal/catch_wildcard_matcher.cpp
+   ${SOURCES_DIR}/internal/catch_wildcard_pattern.cpp
+   ${SOURCES_DIR}/internal/catch_xmlwriter.cpp
+ )
+@@ -456,27 +458,3 @@ if(CATCH_BUILD_EXAMPLES OR CATCH_BUILD_EXTRA_TESTS)
+   target_compile_definitions(Catch2_buildall_interface INTERFACE CATCH_CONFIG_STATIC)
+   target_compile_features(Catch2_buildall_interface INTERFACE cxx_std_14)
+ endif()
+-
+-list(APPEND CATCH_IMPL_TARGETS Catch2 Catch2WithMain)
+-set(CATCH_IMPL_TARGETS ${CATCH_IMPL_TARGETS} PARENT_SCOPE)
+-
+-# We still do not support building dynamic library with hidden visibility
+-# so we want to check & warn users if they do this. However, we won't abort
+-# the configuration step so that we don't have to also provide an override.
+-if(BUILD_SHARED_LIBS)
+-  set_target_properties(Catch2 Catch2WithMain
+-    PROPERTIES
+-      WINDOWS_EXPORT_ALL_SYMBOLS ON
+-  )
+-
+-  get_target_property(_VisPreset Catch2 CXX_VISIBILITY_PRESET)
+-  if(NOT MSVC AND _VisPreset STREQUAL "hidden")
+-    set_target_properties(Catch2 Catch2WithMain
+-      PROPERTIES
+-        CXX_VISIBILITY_PRESET "default"
+-        VISIBILITY_INLINES_HIDDEN OFF
+-    )
+-    message(WARNING "Setting Catch2's visibility to default."
+-                    " Hidden visibility is not supported.")
+-  endif()
+-endif()
+diff --git a/src/catch2/catch_all.hpp b/src/catch2/catch_all.hpp
+index 82b11405..8c0b03ac 100644
+--- a/src/catch2/catch_all.hpp
++++ b/src/catch2/catch_all.hpp
+@@ -1,4 +1,3 @@
+-
+ //              Copyright Catch2 Authors
+ // Distributed under the Boost Software License, Version 1.0.
+ //   (See accompanying file LICENSE.txt or copy at
+@@ -133,6 +132,7 @@
+ #include <catch2/internal/catch_unique_ptr.hpp>
+ #include <catch2/internal/catch_unreachable.hpp>
+ #include <catch2/internal/catch_void_type.hpp>
++#include <catch2/internal/catch_wildcard_matcher.hpp>
+ #include <catch2/internal/catch_wildcard_pattern.hpp>
+ #include <catch2/internal/catch_xmlwriter.hpp>
+ #include <catch2/matchers/catch_matchers_all.hpp>
+diff --git a/src/catch2/internal/catch_wildcard_matcher.cpp b/src/catch2/internal/catch_wildcard_matcher.cpp
+new file mode 100644
+index 00000000..6fd0e837
+--- /dev/null
++++ b/src/catch2/internal/catch_wildcard_matcher.cpp
+@@ -0,0 +1,52 @@
++//              Copyright Catch2 Authors
++// Distributed under the Boost Software License, Version 1.0.
++//   (See accompanying file LICENSE.txt or copy at
++//        https://www.boost.org/LICENSE_1_0.txt)
++
++// SPDX-License-Identifier: BSL-1.0
++#include <catch2/internal/catch_wildcard_matcher.hpp>
++
++namespace Catch {
++
++#if defined( CATCH_CONFIG_WILDCARD_MATCHER )
++    bool WildcardMatcher::matches( std::string_view input ) const noexcept {
++        std::size_t pattern_index = 0;
++        std::size_t input_index = 0;
++        std::size_t starred_pattern_index = std::string_view::npos;
++        std::size_t restart_input_index = 0;
++
++        while( input_index < input.size() ) {
++            if( pattern_index < m_pattern_size ) {
++                char const pattern_char = m_pattern[pattern_index];
++
++                if( pattern_char == '*' ) {
++                    starred_pattern_index = pattern_index++;
++                    restart_input_index = input_index;
++                    continue;
++                }
++
++                if( pattern_char == '?' || pattern_char == input[input_index] ) {
++                    ++pattern_index;
++                    ++input_index;
++                    continue;
++                }
++            }
++
++            if( starred_pattern_index != std::string_view::npos ) {
++                pattern_index = starred_pattern_index + 1;
++                input_index = ++restart_input_index;
++                continue;
++            }
++
++            return false;
++        }
++
++        while( pattern_index < m_pattern_size && m_pattern[pattern_index] == '*' ) {
++            ++pattern_index;
++        }
++
++        return pattern_index == m_pattern_size;
++    }
++#endif
++
++} // namespace Catch
+diff --git a/src/catch2/internal/catch_wildcard_matcher.hpp b/src/catch2/internal/catch_wildcard_matcher.hpp
+new file mode 100644
+index 00000000..22a275dc
+--- /dev/null
++++ b/src/catch2/internal/catch_wildcard_matcher.hpp
+@@ -0,0 +1,50 @@
++//              Copyright Catch2 Authors
++// Distributed under the Boost Software License, Version 1.0.
++//   (See accompanying file LICENSE.txt or copy at
++//        https://www.boost.org/LICENSE_1_0.txt)
++
++// SPDX-License-Identifier: BSL-1.0
++#ifndef CATCH_WILDCARD_MATCHER_HPP_INCLUDED
++#define CATCH_WILDCARD_MATCHER_HPP_INCLUDED
++
++#include <catch2/catch_user_config.hpp>
++
++#if !defined( CATCH_CONFIG_NO_WILDCARD_MATCHER ) && \
++    !defined( CATCH_CONFIG_WILDCARD_MATCHER )
++#    define CATCH_CONFIG_WILDCARD_MATCHER
++#endif
++
++#include <array>
++#include <cstddef>
++#include <string_view>
++
++namespace Catch {
++
++#if defined( CATCH_CONFIG_WILDCARD_MATCHER )
++    class WildcardMatcher {
++        static constexpr std::size_t max_pattern_size = 1024;
++
++    public:
++        template <std::size_t N>
++        explicit WildcardMatcher( char const (&pattern)[N] ) noexcept:
++            m_pattern_size( N - 1 ) {
++            static_assert( N > 0, "Wildcard pattern must be null-terminated" );
++            static_assert( N - 1 <= max_pattern_size,
++                           "Wildcard pattern length must be at most 1024" );
++
++            for( std::size_t i = 0; i < m_pattern_size; ++i ) {
++                m_pattern[i] = pattern[i];
++            }
++        }
++
++        bool matches( std::string_view input ) const noexcept;
++
++    private:
++        std::array<char, max_pattern_size> m_pattern{};
++        std::size_t m_pattern_size;
++    };
++#endif
++
++} // namespace Catch
++
++#endif // CATCH_WILDCARD_MATCHER_HPP_INCLUDED

@@ -151,7 +151,7 @@ set(IMPL_HEADERS
   ${SOURCES_DIR}/internal/catch_unique_ptr.hpp
   ${SOURCES_DIR}/internal/catch_unreachable.hpp
   ${SOURCES_DIR}/internal/catch_void_type.hpp
-  ${SOURCES_DIR}/internal/catch_wildcard_pattern.hpp
+  ${SOURCES_DIR}/internal/catch_wildcard_matcher.hpp
   ${SOURCES_DIR}/internal/catch_windows_h_proxy.hpp
   ${SOURCES_DIR}/internal/catch_xmlwriter.hpp
 )
@@ -218,8 +218,8 @@ set(IMPL_SOURCES
   ${SOURCES_DIR}/internal/catch_test_spec_parser.cpp
   ${SOURCES_DIR}/internal/catch_textflow.cpp
   ${SOURCES_DIR}/internal/catch_uncaught_exceptions.cpp
+  ${SOURCES_DIR}/internal/catch_wildcard_matcher.cpp
   ${SOURCES_DIR}/internal/catch_wildcard_pattern.cpp
-  ${SOURCES_DIR}/internal/catch_xmlwriter.cpp
 )
 set(INTERNAL_FILES ${IMPL_SOURCES} ${IMPL_HEADERS})
 
@@ -457,6 +457,30 @@ if(CATCH_BUILD_EXAMPLES OR CATCH_BUILD_EXTRA_TESTS)
   target_compile_features(Catch2_buildall_interface INTERFACE cxx_std_14)
 endif()
 
+endif()
+
+list(APPEND CATCH_IMPL_TARGETS Catch2 Catch2WithMain)
+set(CATCH_IMPL_TARGETS ${CATCH_IMPL_TARGETS} PARENT_SCOPE)
+
+# We still do not support building dynamic library with hidden visibility
+# so we want to check & warn users if they do this. However, we won't abort
+# the configuration step so that we don't have to also provide an override.
+if(BUILD_SHARED_LIBS)
+  set_target_properties(Catch2 Catch2WithMain
+    PROPERTIES
+      WINDOWS_EXPORT_ALL_SYMBOLS ON
+  )
+
+  get_target_property(_VisPreset Catch2 CXX_VISIBILITY_PRESET)
+  if(NOT MSVC AND _VisPreset STREQUAL "hidden")
+    set_target_properties(Catch2 Catch2WithMain
+      PROPERTIES
+        CXX_VISIBILITY_PRESET "default"
+        VISIBILITY_INLINES_HIDDEN OFF
+    )
+    message(WARNING "Setting Catch2's visibility to default."
+                    " Hidden visibility is not supported.")
+  endif()
 list(APPEND CATCH_IMPL_TARGETS Catch2 Catch2WithMain)
 set(CATCH_IMPL_TARGETS ${CATCH_IMPL_TARGETS} PARENT_SCOPE)
 

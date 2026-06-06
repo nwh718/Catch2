@@ -1,4 +1,5 @@
 
+
 //              Copyright Catch2 Authors
 // Distributed under the Boost Software License, Version 1.0.
 //   (See accompanying file LICENSE.txt or copy at
@@ -132,7 +133,6 @@
 #include <catch2/internal/catch_unique_name.hpp>
 #include <catch2/internal/catch_unique_ptr.hpp>
 #include <catch2/internal/catch_unreachable.hpp>
-#include <catch2/internal/catch_void_type.hpp>
 #include <catch2/internal/catch_wildcard_pattern.hpp>
 #include <catch2/internal/catch_xmlwriter.hpp>
 #include <catch2/matchers/catch_matchers_all.hpp>
