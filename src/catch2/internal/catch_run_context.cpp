@@ -52,17 +52,10 @@ namespace Catch {
                     assert( m_generator &&
                             "Cannot create tracker without generator" );
 
-                    // Handle potential filter and move forward here...
-                    // Old style filters do not affect generators at all
                     if (m_newStyleFilters && m_allTrackerDepth < m_filterRef->size()) {
                         auto const& filter =
                             ( *m_filterRef )[m_allTrackerDepth];
-                        // Generator cannot be un-entered the way a section
-                        // can be, so the tracker has to throw for a wrong
-                        // filter to stop the execution flow.
                         if (filter.type == PathFilter::For::Section) {
-                            // We want the semantics of `SKIP()`, but we inline it
-                            // to avoid issues with conditionally prefixed macros
                             INTERNAL_CATCH_MSG(
                                 "SKIP",
                                 Catch::ResultWas::ExplicitSkip,
@@ -70,16 +63,14 @@ namespace Catch {
                                 "" );
                             Catch::Detail::Unreachable();
                         }
-                        // '*' is the wildcard for "all elements in generator"
-                        // used for filtering sections below the generator, but
-                        // not the generator itself.
                         if ( filter.filter != "*" ) {
                             m_isFiltered = true;
-                            // TBD: We assume that the filter was validated as
-                            //      number during parsing. We should pass it
-                            //      as number from the CLI parser.
-                            size_t targetIndex = std::stoul( filter.filter );
-                            m_generator->skipToNthElement( targetIndex );
+                            auto targetIndex = parseUInt( filter.filter, 0 );
+                            if ( !targetIndex ) {
+                                Detail::throw_generator_exception(
+                                    "Invalid generator filter index" );
+                            }
+                            m_generator->skipToNthElement( *targetIndex );
                         }
                     }
                 }

@@ -96,61 +96,6 @@ namespace Catch {
         return lhs.type == rhs.type && lhs.filter == rhs.filter;
     }
 
-    Config::Config( ConfigData const& data ):
-        m_data( data ) {
-        // We need to trim filter specs to avoid trouble with superfluous
-        // whitespace (esp. important for bdd macros, as those are manually
-        // aligned with whitespace).
-
-        for (auto& elem : m_data.testsOrTags) {
-            elem = trim(elem);
-        }
-
-        // Insert the default reporter if user hasn't asked for a specific one
-        if ( m_data.reporterSpecifications.empty() ) {
-#if defined( CATCH_CONFIG_DEFAULT_REPORTER )
-            const auto default_spec = CATCH_CONFIG_DEFAULT_REPORTER;
-#else
-            const auto default_spec = "console";
-#endif
-            auto parsed = parseReporterSpec(default_spec);
-            CATCH_ENFORCE( parsed,
-                           "Cannot parse the provided default reporter spec: '"
-                               << default_spec << '\'' );
-            m_data.reporterSpecifications.push_back( std::move( *parsed ) );
-        }
-
-        // Reading bazel env vars can change some parts of the config data,
-        // so we have to process the bazel env before acting on the config.
-        if ( enableBazelEnvSupport() ) {
-            readBazelEnvVars();
-        }
-
-        // Bazel support can modify the test specs, so parsing has to happen
-        // after reading Bazel env vars.
-        TestSpecParser parser( ITagAliasRegistry::get() );
-        if ( !m_data.testsOrTags.empty() ) {
-            m_hasTestFilters = true;
-            for ( auto const& testOrTags : m_data.testsOrTags ) {
-                parser.parse( testOrTags );
-            }
-        }
-        m_testSpec = parser.testSpec();
-
-
-        // We now fixup the reporter specs to handle default output spec,
-        // default colour spec, etc
-        bool defaultOutputUsed = false;
-        for ( auto const& reporterSpec : m_data.reporterSpecifications ) {
-            // We do the default-output check separately, while always
-            // using the default output below to make the code simpler
-            // and avoid superfluous copies.
-            if ( reporterSpec.outputFile().none() ) {
-                CATCH_ENFORCE( !defaultOutputUsed,
-                               "Internal error: cannot use default output for "
-                               "multiple reporters" );
-                defaultOutputUsed = true;
-            }
 
             m_processedReporterSpecs.push_back( ProcessedReporterSpec{
                 reporterSpec.name(),
@@ -172,6 +117,30 @@ namespace Catch {
     std::vector<std::string> const& Config::getTestsOrTags() const { return m_data.testsOrTags; }
     std::vector<PathFilter> const& Config::getPathFilters() const { return m_data.pathFilters; }
     bool Config::useNewFilterBehaviour() const { return m_data.useNewPathFilteringBehaviour; }
+
+    bool Config::validatePathFilters() const {
+        if ( m_data.pathFilters.empty() ) {
+            return true;
+        }
+        auto parsed = parsePathFilters( m_data.pathFilters );
+        for ( auto const& pf : parsed ) {
+            if ( pf.type == PathFilter::For::Generator &&
+                 pf.filter != "*" ) {
+                if ( !pf.generatorIndex ) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
+    PathFilterStats Config::getPathFilterStats() const {
+        return computePathFilterStats( m_data.pathFilters );
+    }
+
+    std::vector<ParsedFilter> Config::getParsedPathFilters() const {
+        return parsePathFilters( m_data.pathFilters );
+    }
 
     std::vector<ReporterSpec> const& Config::getReporterSpecs() const {
         return m_data.reporterSpecifications;

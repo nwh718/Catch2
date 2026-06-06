@@ -43,31 +43,6 @@ namespace Catch {
             return !( lhs == rhs );
         }
     };
-
-    struct ConfigData {
-
-        bool listTests = false;
-        bool listTags = false;
-        bool listReporters = false;
-        bool listListeners = false;
-
-        bool showSuccessfulTests = false;
-        bool shouldDebugBreak = false;
-        bool noThrow = false;
-        bool showHelp = false;
-        bool showInvisibles = false;
-        bool filenamesAsTags = false;
-        bool libIdentify = false;
-        bool allowZeroTests = false;
-
-        int abortAfter = -1;
-        uint32_t rngSeed = generateRandomSeed(GenerateFrom::Default);
-
-        unsigned int shardCount = 1;
-        unsigned int shardIndex = 0;
-
-        bool skipBenchmarks = false;
-        bool benchmarkNoAnalysis = false;
         unsigned int benchmarkSamples = 100;
         double benchmarkConfidenceInterval = 0.95;
         unsigned int benchmarkResamples = 100'000;
@@ -146,6 +121,10 @@ namespace Catch {
         double benchmarkConfidenceInterval() const override;
         unsigned int benchmarkResamples() const override;
         std::chrono::milliseconds benchmarkWarmupTime() const override;
+
+        bool validatePathFilters() const;
+        PathFilterStats getPathFilterStats() const;
+        std::vector<ParsedFilter> getParsedPathFilters() const;
 
     private:
         // Reads Bazel env vars and applies them to the config
