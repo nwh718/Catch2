@@ -7,7 +7,6 @@
 // SPDX-License-Identifier: BSL-1.0
 #include <catch2/internal/catch_run_context.hpp>
 
-#include <catch2/catch_user_config.hpp>
 #include <catch2/generators/catch_generators_throw.hpp>
 #include <catch2/interfaces/catch_interfaces_config.hpp>
 #include <catch2/interfaces/catch_interfaces_generatortracker.hpp>
@@ -52,6 +51,7 @@ namespace Catch {
                     assert( m_generator &&
                             "Cannot create tracker without generator" );
 
+                    // Handle potential filter and move forward here...
                     // Handle potential filter and move forward here...
                     // Old style filters do not affect generators at all
                     if (m_newStyleFilters && m_allTrackerDepth < m_filterRef->size()) {
@@ -158,26 +158,20 @@ namespace Catch {
                         // No filters left -> no restrictions on running sections
                         size_t childDepth = 1 + (m_newStyleFilters ? m_allTrackerDepth : m_sectionOnlyDepth);
                         if ( childDepth >= m_filterRef->size() ) {
-                            return true;
-                        }
-
-                        // If we are using the new style filters, we need to check
-                        // whether the successive filter is for section or a generator.
                         if ( m_newStyleFilters
                             && (*m_filterRef)[childDepth].type != PathFilter::For::Section ) {
                             return false;
                         }
                         // Look for any child section that could match the remaining filters
                         for ( auto const& child : m_children ) {
-                            if ( child->isSectionTracker() &&
+                            && (*m_filterRef)[childDepth].type != PathFilter::For::Section ) {
                                  static_cast<SectionTracker const&>( *child )
                                          .trimmedName() == StringRef((*m_filterRef)[childDepth].filter) ) {
                                 return true;
                             }
                         }
                         return false;
-                    }();
-
+                                         .trimmedName() == StringRef((*m_filterRef)[childDepth].filter) ) {
                     // This check is a bit tricky, because m_generator->next()
                     // has a side-effect, where it consumes generator's current
                     // value, but we do not want to invoke the side-effect if

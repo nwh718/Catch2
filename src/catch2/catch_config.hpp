@@ -18,7 +18,6 @@
 #include <catch2/internal/catch_reporter_spec_parser.hpp>
 
 #include <chrono>
-#include <map>
 #include <string>
 #include <vector>
 
@@ -44,30 +43,31 @@ namespace Catch {
         }
     };
 
+    struct ResolvedPathFilter {
+        enum class Kind {
+            None,
+            TrackerMismatch,
+            Section,
+            GeneratorWildcard,
+            GeneratorIndex,
+        };
+
+        Kind kind = Kind::None;
+        StringRef filter;
+        std::size_t generatorIndex = 0;
+    };
+
+    PathFilter const* pathFilterAtDepth(
+        std::vector<PathFilter> const& pathFilters,
+        std::size_t depth );
+    ResolvedPathFilter resolveActivePathFilter(
+        std::vector<PathFilter> const& pathFilters,
+        bool useNewFilterBehaviour,
+        std::size_t allTrackerDepth,
+        std::size_t sectionOnlyDepth,
+        PathFilter::For trackerType );
+
     struct ConfigData {
-
-        bool listTests = false;
-        bool listTags = false;
-        bool listReporters = false;
-        bool listListeners = false;
-
-        bool showSuccessfulTests = false;
-        bool shouldDebugBreak = false;
-        bool noThrow = false;
-        bool showHelp = false;
-        bool showInvisibles = false;
-        bool filenamesAsTags = false;
-        bool libIdentify = false;
-        bool allowZeroTests = false;
-
-        int abortAfter = -1;
-        uint32_t rngSeed = generateRandomSeed(GenerateFrom::Default);
-
-        unsigned int shardCount = 1;
-        unsigned int shardIndex = 0;
-
-        bool skipBenchmarks = false;
-        bool benchmarkNoAnalysis = false;
         unsigned int benchmarkSamples = 100;
         double benchmarkConfidenceInterval = 0.95;
         unsigned int benchmarkResamples = 100'000;

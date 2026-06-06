@@ -7,7 +7,6 @@
 // SPDX-License-Identifier: BSL-1.0
 #include <catch2/internal/catch_test_case_tracker.hpp>
 
-#include <catch2/internal/catch_enforce.hpp>
 #include <catch2/internal/catch_move_and_forward.hpp>
 #include <catch2/internal/catch_path_filter.hpp>
 #include <catch2/internal/catch_string_manip.hpp>
@@ -178,7 +177,8 @@ namespace TestCaseTracking {
 
     bool SectionTracker::isComplete() const {
         // If there are active filters AND we do not pass them,
-        // the section is always "completed"
+                                          PathFilter::For::Section ) {
+                return true;
         const size_t filterIndex =
             m_newStyleFilters ? m_allTrackerDepth : m_sectionOnlyDepth;
         if ( filterIndex < m_filterRef->size() ) {
